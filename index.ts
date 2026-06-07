@@ -1,9 +1,10 @@
 import { addHook, addPostType, addCatType, type PluginMeta } from "@/hook";
-import { Text, Select, Switch } from "@/components/ui";
+import { Text, Textarea, Select, Switch, Tags } from "@/components/ui";
 import ProductLayout1 from "./product/Layout1";
 import ProductLayout2 from "./product/Layout2";
 import ProductCategoryLayout1 from "./product-category/Layout1";
 import ProductCategoryLayout2 from "./product-category/Layout2";
+import Variate from "./variate/Variate";
 
 // ─── Plugin metadata ───────────────────────────────────────────────────────────
 export const PLUGINS: PluginMeta = {
@@ -22,7 +23,7 @@ export const PLUGINS: PluginMeta = {
  * Called by PluginList.reregisterHooks() after the gate is armed.
  */
 export function register() {
-    // ─── Register the "product" post type ──────────────────────────────────
+    // ─── Register post & category types ────────────────────────────────────
     addPostType([
         {
             key: "product",
@@ -33,7 +34,6 @@ export function register() {
         },
     ], PLUGINS.nx);
 
-    // ─── Register the "product-category" category type ──────────────────────
     addCatType([
         {
             key: "product-category",
@@ -42,6 +42,22 @@ export function register() {
             icon: "solar:folder-with-files-bold",
             color: "from-emerald-500 to-teal-600",
             position: 30,
+        },
+        {
+            key: "brands",
+            label: "Brands",
+            postType: "product",
+            icon: "solar:tag-bold",
+            color: "from-orange-500 to-amber-600",
+            position: 31,
+        },
+        {
+            key: "attributes",
+            label: "Attributes",
+            postType: "product",
+            icon: "solar:list-bold",
+            color: "from-cyan-500 to-sky-600",
+            position: 32,
         },
     ], PLUGINS.nx);
 
@@ -72,41 +88,41 @@ export function register() {
             parent: "product",
             position: 3,
         },
-    ], PLUGINS.nx);
-
-    // ─── Product-specific form fields ───────────────────────────────────────
-    addHook("post.form", [
         {
-            key: "product_price",
-            label: "Price",
-            type: "product",
-            style: "right",
-            position: 10,
-            component: Text,
+            key: "product-brands",
+            label: "Brands",
+            icon: "solar:tag-bold",
+            slug: "category/brands",
+            parent: "product",
+            position: 4,
         },
         {
-            key: "product_sku",
+            key: "product-attributes",
+            label: "Attributes",
+            icon: "solar:list-bold",
+            slug: "category/attributes",
+            parent: "product",
+            position: 5,
+        },
+    ], PLUGINS.nx);
+
+    // ─── Product post form fields ───────────────────────────────────────────
+    addHook("post.form", [
+        {
+            key: "_variate",
+            label: "Pricing & Stock",
+            type: "product",
+            style: "left",
+            position: 10,
+            component: Variate,
+        },
+        {
+            key: "sku",
             label: "SKU",
             type: "product",
             style: "right",
             position: 20,
             component: Text,
-        },
-        {
-            key: "product_stock",
-            label: "Stock Quantity",
-            type: "product",
-            style: "right",
-            position: 30,
-            component: Text,
-        },
-        {
-            key: "product_in_stock",
-            label: "In Stock",
-            type: "product",
-            style: "right",
-            position: 40,
-            component: Switch,
         },
         {
             key: "product_condition",
@@ -121,6 +137,115 @@ export function register() {
                 { label: "Refurbished", value: "refurbished" },
             ],
         },
+        {
+            key: "product_weight",
+            label: "Weight (kg)",
+            type: "product",
+            style: "right",
+            position: 60,
+            component: Text,
+        },
+        {
+            key: "product_dimensions",
+            label: "Dimensions (L×W×H cm)",
+            type: "product",
+            style: "right",
+            position: 70,
+            component: Text,
+        },
+    ], PLUGINS.nx);
+
+    // ─── Product Category cat form fields ───────────────────────────────────
+    addHook("cat.form", [
+        {
+            key: "cat_image",
+            label: "Category Image",
+            type: "product-category",
+            style: "right",
+            position: 5,
+            fieldType: "gallery",
+        },
+        {
+            key: "cat_icon",
+            label: "Category Icon",
+            type: "product-category",
+            style: "right",
+            position: 6,
+            component: Text,
+        },
+        {
+            key: "cat_featured",
+            label: "Featured Category",
+            type: "product-category",
+            style: "right",
+            position: 10,
+            component: Switch,
+        },
+        {
+            key: "specifications",
+            label: "Specifications",
+            type: "product-category",
+            style: "left",
+            position: 200,
+            fieldType: "specification",
+        },
+    ], PLUGINS.nx);
+
+    // ─── Brands cat form fields ─────────────────────────────────────────────
+    addHook("cat.form", [
+        {
+            key: "brand_logo",
+            label: "Brand Logo URL",
+            type: "brands",
+            style: "right",
+            position: 5,
+            fieldType: "gallery",
+        },
+        {
+            key: "brand_website",
+            label: "Brand Website",
+            type: "brands",
+            style: "right",
+            position: 10,
+            component: Text,
+        },
+        {
+            key: "brand_description",
+            label: "Description",
+            type: "brands",
+            style: "left",
+            position: 10,
+            component: Textarea,
+        },
+        {
+            key: "brand_featured",
+            label: "Featured Brand",
+            type: "brands",
+            style: "right",
+            position: 20,
+            component: Switch,
+        },
+        {
+            key: "brand_country",
+            label: "Country of Origin",
+            type: "brands",
+            style: "right",
+            position: 30,
+            component: Text,
+        },
+    ], PLUGINS.nx);
+
+    // ─── Attributes cat form fields ─────────────────────────────────────────
+    addHook("cat.form", [
+        {
+            key: "linkedCategories",
+            label: "Linked Categories",
+            type: "attributes",
+            style: "left",
+            position: 5,
+            fieldType: "linked-cats",
+            linkedCatType: "product-category",
+        },
     ], PLUGINS.nx);
 
     // ─── Product page templates ─────────────────────────────────────────────
@@ -132,7 +257,7 @@ export function register() {
             slug: "dynamic",
             style: "left",
             position: 10,
-            active: true,           // first-boot default
+            active: true,
             component: ProductLayout1,
         },
         {
@@ -156,7 +281,7 @@ export function register() {
             slug: "dynamic",
             style: "left",
             position: 10,
-            active: true,           // first-boot default
+            active: true,
             component: ProductCategoryLayout1,
         },
         {
