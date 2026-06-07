@@ -44,19 +44,22 @@ export default function PostSpecification({ value, onChange, ctx }: FieldProps) 
     const categoryId   = (ctx?.categoryId   as string)   ?? "";
     const categoryPath = (ctx?.categoryPath as string[]) ?? [];
 
-    const initialised    = useRef(false);
-    const lastCategoryId = useRef("");
+    const valueLoaded    = useRef(false);
+    const lastCategoryId = useRef<string | null>(null);
     const lastFetchedId  = useRef("");
 
     const [specs, setSpecs]         = useState<SpecBox[]>(() => parseBlob(value));
     const [template, setTemplate]   = useState<SpecBox[]>([]);
     const [loading, setLoading]     = useState(false);
 
-    // Restore from saved value on mount (edit mode)
+    // Restore from saved value — waits for the first real value from PostForm
+    // (edit mode: PostForm loads the post async, so value starts as "")
     useEffect(() => {
-        if (initialised.current) return;
-        initialised.current = true;
-        setSpecs(parseBlob(value));
+        if (valueLoaded.current) return;
+        if (value !== "") {
+            valueLoaded.current = true;
+            setSpecs(parseBlob(value));
+        }
     }, [value]);
 
     // Flush to parent
@@ -107,9 +110,13 @@ export default function PostSpecification({ value, onChange, ctx }: FieldProps) 
         fetchTemplate(categoryId, categoryPath);
     }, [categoryId, categoryPath.join(","), fetchTemplate]);
 
-    // Reset specs when category changes (after mount)
+    // Reset specs only when the user actively switches category after load
     useEffect(() => {
-        if (!initialised.current) return;
+        if (!valueLoaded.current) return;
+        if (lastCategoryId.current === null) {
+            lastCategoryId.current = categoryId;
+            return;
+        }
         if (lastCategoryId.current !== categoryId) {
             lastCategoryId.current = categoryId;
             setSpecs([]);
