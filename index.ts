@@ -1,10 +1,11 @@
 import { addHook, addPostType, addCatType, type PluginMeta } from "@/hook";
-import { Text, Textarea, Select, Switch, Tags } from "@/components/ui";
+import { Text, Textarea, Select, Switch, Tags, CategoryHierarchicalSelect } from "@/components/ui";
 import ProductLayout1 from "./product/Layout1";
 import ProductLayout2 from "./product/Layout2";
 import ProductCategoryLayout1 from "./product-category/Layout1";
 import ProductCategoryLayout2 from "./product-category/Layout2";
 import Variate from "./variate/Variate";
+import PostSpecification from "./variate/PostSpecification";
 
 // ─── Plugin metadata ───────────────────────────────────────────────────────────
 export const PLUGINS: PluginMeta = {
@@ -117,11 +118,28 @@ export function register() {
             component: Variate,
         },
         {
+            key: "_specifications",
+            label: "Specifications",
+            type: "product",
+            style: "left",
+            position: 20,
+            component: PostSpecification,
+        },
+        {
+            key: "category",
+            label: "Category",
+            type: "product",
+            style: "right",
+            position: 5,
+            component: CategoryHierarchicalSelect,
+            hierarchicalCatType: "product-category",
+        },
+        {
             key: "sku",
             label: "SKU",
             type: "product",
             style: "right",
-            position: 20,
+            position: 30,
             component: Text,
         },
         {
