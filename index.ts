@@ -6,6 +6,7 @@ import ProductCategoryLayout1 from "./product-category/Layout1";
 import ProductCategoryLayout2 from "./product-category/Layout2";
 import Variate from "./variate/Variate";
 import PostSpecification from "./variate/PostSpecification";
+import ProductSettingsPage from "./settings/ProductSettingsPage";
 
 // ─── Plugin metadata ───────────────────────────────────────────────────────────
 export const PLUGINS: PluginMeta = {
@@ -311,6 +312,85 @@ export function register() {
             position: 20,
             active: false,
             component: ProductCategoryLayout2,
+        },
+    ], PLUGINS.nx);
+
+    // ─── Product admin nav: settings link ──────────────────────────────────
+    addHook("admin.nav", [
+        {
+            key: "product-settings",
+            label: "Product Settings",
+            icon: "solar:settings-bold",
+            slug: "product/settings",
+            parent: "product",
+            position: 99,
+        },
+    ], PLUGINS.nx);
+
+    // ─── Product dedicated settings page ───────────────────────────────────
+    // URL: /admin/product/settings
+    // Completely isolated — only fields with type "product-settings" appear.
+    addHook("admin.pages", [
+        {
+            key: "product/settings",
+            label: "Product Settings",
+            type: "product-settings",
+            style: "left",
+            position: 10,
+            path: ProductSettingsPage,
+        },
+    ], PLUGINS.nx);
+
+    // ─── Product settings form fields ───────────────────────────────────────
+    // type: "product-settings" → shown only on the product settings page.
+    addHook("setting.form", [
+        {
+            key: "product_currency",
+            label: "Currency",
+            type: "product-settings",
+            style: "left",
+            position: 10,
+            component: Text,
+        },
+        {
+            key: "product_currency_symbol",
+            label: "Currency Symbol",
+            type: "product-settings",
+            style: "left",
+            position: 20,
+            component: Text,
+        },
+        {
+            key: "product_tax_rate",
+            label: "Tax Rate (%)",
+            type: "product-settings",
+            style: "left",
+            position: 30,
+            component: Text,
+        },
+        {
+            key: "product_free_shipping_min",
+            label: "Free Shipping Minimum Order",
+            type: "product-settings",
+            style: "right",
+            position: 10,
+            component: Text,
+        },
+        {
+            key: "product_out_of_stock_msg",
+            label: "Out of Stock Message",
+            type: "product-settings",
+            style: "right",
+            position: 20,
+            component: Text,
+        },
+        {
+            key: "product_reviews_enabled",
+            label: "Enable Reviews",
+            type: "product-settings",
+            style: "right",
+            position: 30,
+            component: Switch,
         },
     ], PLUGINS.nx);
 }
