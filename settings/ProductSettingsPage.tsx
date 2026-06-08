@@ -1,7 +1,7 @@
 "use client";
 
 import { Icon } from "@iconify/react";
-import FormSettings from "@/components/FormSettings";
+import FormSettings from "@/components/admin/FormSettings";
 import { useActivePlugins } from "@/hook/useActivePlugins";
 import useSettings from "@/lib/useSettings";
 
