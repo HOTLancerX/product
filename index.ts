@@ -7,6 +7,12 @@ import ProductCategoryLayout2 from "./product-category/Layout2";
 import Variate from "./variate/Variate";
 import PostSpecification from "./variate/PostSpecification";
 import ProductSettingsPage from "./settings/ProductSettingsPage";
+import ProductBox1 from "./box/Product-1";
+import ProductBox2 from "./box/Product-2";
+// NOTE: lib/category.ts is NOT imported here — it imports Mongoose models
+// and would pollute the client bundle via the plugin registry chain.
+// Instead, we register a lazy wrapper below that only resolves the import
+// at call time (server-side only, inside an async function).
 
 // ─── Plugin metadata ───────────────────────────────────────────────────────────
 export const PLUGINS: PluginMeta = {
@@ -172,6 +178,22 @@ export function register() {
             position: 70,
             component: Text,
         },
+        {
+            key: "shortDescription",
+            label: "Short Description",
+            type: "product",
+            style: "left",
+            position: 5,
+            component: Textarea,
+        },
+        {
+            key: "orderNote",
+            label: "Order Note Label (leave blank to hide)",
+            type: "product",
+            style: "right",
+            position: 75,
+            component: Text,
+        },
     ], PLUGINS.nx);
 
     // ─── Product Category cat form fields ───────────────────────────────────
@@ -315,6 +337,32 @@ export function register() {
         },
     ], PLUGINS.nx);
 
+    // ─── Product box templates (reusable card components) ──────────────────
+    // type: "product-box" — shown in the Template manager and used by
+    // category/listing pages to render individual product cards.
+    addHook("root.pages", [
+        {
+            key: "product-box",
+            label: "Product Box 1",
+            type: "product-box",
+            slug: "dynamic",
+            style: "left",
+            position: 10,
+            active: true,
+            component: ProductBox1,
+        },
+        {
+            key: "product-box",
+            label: "Product Box 2",
+            type: "product-box",
+            slug: "dynamic",
+            style: "left",
+            position: 20,
+            active: false,
+            component: ProductBox2,
+        },
+    ], PLUGINS.nx);
+
     // ─── Product admin nav: settings link ──────────────────────────────────
     addHook("admin.nav", [
         {
@@ -391,6 +439,30 @@ export function register() {
             style: "right",
             position: 30,
             component: Switch,
+        },
+        {
+            key: "product_whatsapp_number",
+            label: "WhatsApp Number (with country code)",
+            type: "product-settings",
+            style: "left",
+            position: 40,
+            component: Text,
+        },
+        {
+            key: "product_telegram_username",
+            label: "Telegram Username",
+            type: "product-settings",
+            style: "left",
+            position: 50,
+            component: Text,
+        },
+        {
+            key: "product_facebook_page_id",
+            label: "Facebook Page ID (Messenger)",
+            type: "product-settings",
+            style: "left",
+            position: 60,
+            component: Text,
         },
     ], PLUGINS.nx);
 }

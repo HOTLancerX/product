@@ -1,0 +1,774 @@
+'use client';
+
+/**
+ * ProductClient.tsx — Interactive product page shell.
+ *
+ * layout={1} → clean light theme (Layout1)
+ * layout={2} → dark emerald theme (Layout2)
+ *
+ * Rule: title, variants, quantity, and cart buttons are ALWAYS rendered.
+ * Price and stock badges are only shown when the values are > 0.
+ */
+
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import dynamic from 'next/dynamic';
+import Link from 'next/link';
+import { Icon } from '@iconify/react';
+import { useToast } from '@/components/ui/Toast';
+import Slider from './Slider';
+import Variant from './Variant';
+import Specification from './Specification';
+
+const Compare = dynamic(() => import('@/plugin/compare/ui/Compare'), { ssr: false });
+
+// ── Types ─────────────────────────────────────────────────────────────────────
+
+export interface ProductClientProps {
+    layout: 1 | 2;
+    data: { id: string; title: string; slug: string };
+    priceType: 'single' | 'variant';
+    regularPrice: number;
+    sellingPrice: number;
+    displayPrice: number;
+    hasDiscount: boolean;
+    discountPercent: number;
+    singleStock: number;
+    variants: any[];
+    selectedAttributes: any[];
+    variantDisplayStyle: string;
+    allImages: string[];
+    specifications: any[];
+    compareIds: string[];
+    currencySymbol: string;
+    whatsappNumber: string;
+    telegramUsername: string;
+    facebookPageId: string;
+    shortDescription: string;
+    description: string;
+    htmlDescription: string;
+    orderNote: string;
+    /** Category breadcrumb — root to leaf, each with title + url */
+    categoryLinks?: { title: string; url: string }[];
+}
+
+interface ShellProps {
+    data: { id: string; title: string; slug: string };
+    priceType: string;
+    regularPrice: number;
+    hasDiscount: boolean;
+    discountPercent: number;
+    currentPrice: number;
+    currentStock: number;
+    quantity: number;
+    noteValue: string;
+    setNoteValue: (v: string) => void;
+    dec: () => void;
+    inc: () => void;
+    setQuantity: (v: number) => void;
+    gallery: string[];
+    attributes: any[];
+    selectedOptions: Record<string, string>;
+    selectedVariant: any;
+    variantDisplayStyle: string;
+    handleOptionSelect: (label: string, value: string) => void;
+    handleAddToCart: () => void;
+    handleBuyNow: () => void;
+    handleSocial: (platform: 'whatsapp' | 'messenger' | 'telegram') => void;
+    socialCount: number;
+    whatsappNumber: string;
+    facebookPageId: string;
+    telegramUsername: string;
+    shortDescription: string;
+    orderNote: string;
+    currencySymbol: string;
+    variants: any[];
+    categoryLinks: { title: string; url: string }[];
+}
+
+// ── Cart ──────────────────────────────────────────────────────────────────────
+
+interface CartItem {
+    productId: string;
+    productSlug: string;
+    productTitle: string;
+    productImage: string;
+    variantId?: string;
+    variantOptions?: Record<string, string>;
+    sku?: string;
+    price: number;
+    quantity: number;
+}
+
+function addToCart(item: CartItem) {
+    if (typeof window !== 'undefined' && typeof (window as any).__cmsAddToCart === 'function') {
+        (window as any).__cmsAddToCart(item);
+        return;
+    }
+    try {
+        const raw  = localStorage.getItem('cms_cart');
+        const cart: CartItem[] = raw ? JSON.parse(raw) : [];
+        const idx  = cart.findIndex(
+            (c) => c.productId === item.productId && c.variantId === item.variantId
+        );
+        if (idx >= 0) cart[idx].quantity += item.quantity;
+        else           cart.push(item);
+        localStorage.setItem('cms_cart', JSON.stringify(cart));
+        window.dispatchEvent(new Event('cms_cart_updated'));
+    } catch { /* localStorage unavailable */ }
+}
+
+// ── Attribute builder ─────────────────────────────────────────────────────────
+
+function buildAttributes(variants: any[], selectedAttributes: any[]) {
+    if (!variants?.length) return [];
+
+    const attrMap: Record<string, Set<string>> = {};
+    variants.forEach((v: any) => {
+        if (!v.options) return;
+        Object.entries(v.options).forEach(([key, value]) => {
+            if (!attrMap[key]) attrMap[key] = new Set();
+            attrMap[key].add(value as string);
+        });
+    });
+
+    if (selectedAttributes?.length > 0) {
+        return [...selectedAttributes]
+            .sort((a: any, b: any) => (a.position ?? 0) - (b.position ?? 0))
+            .filter((sa: any) => attrMap[sa.label])
+            .map((sa: any) => {
+                const saved = (sa.values || []).filter((v: string) => attrMap[sa.label]?.has(v));
+                const extra = Array.from(attrMap[sa.label] || []).filter((v) => !saved.includes(v));
+                return { label: sa.label, values: [...saved, ...extra], displayStyle: sa.displayStyle, position: sa.position };
+            });
+    }
+
+    return Object.entries(attrMap).map(([label, values]) => ({
+        label, values: Array.from(values),
+    }));
+}
+
+function fmtPrice(n: number) {
+    return Number(n).toLocaleString('en-US', {
+        minimumFractionDigits: n % 1 === 0 ? 0 : 2,
+        maximumFractionDigits: 2,
+    });
+}
+
+// ── Main component ────────────────────────────────────────────────────────────
+
+export default function ProductClient({
+    layout,
+    data,
+    priceType,
+    regularPrice,
+    displayPrice,
+    hasDiscount,
+    discountPercent,
+    singleStock,
+    variants,
+    selectedAttributes,
+    variantDisplayStyle,
+    allImages,
+    specifications,
+    compareIds,
+    currencySymbol,
+    whatsappNumber,
+    telegramUsername,
+    facebookPageId,
+    shortDescription,
+    description,
+    htmlDescription,
+    orderNote,
+    categoryLinks = [],
+}: ProductClientProps) {
+    const { success, error } = useToast();
+
+    // ── Variant selection ─────────────────────────────────────────────────────
+    const [selectedVariant, setSelectedVariant] = useState<any>(
+        () => variants[0] ?? null
+    );
+    const [selectedOptions, setSelectedOptions] = useState<Record<string, string>>(
+        () => variants[0]?.options ? { ...variants[0].options } : {}
+    );
+
+    const attributes = useMemo(
+        () => buildAttributes(variants, selectedAttributes),
+        [variants, selectedAttributes]
+    );
+
+    const findVariantByOptions = useCallback(
+        (opts: Record<string, string>) =>
+            variants.find((v: any) => {
+                if (!v.options) return false;
+                return Object.entries(opts).every(([k, val]) => v.options[k] === val);
+            }) ?? null,
+        [variants]
+    );
+
+    const handleOptionSelect = (label: string, value: string) => {
+        const next = { ...selectedOptions, [label]: value };
+        setSelectedOptions(next);
+        const variant = findVariantByOptions(next);
+        if (variant) setSelectedVariant(variant);
+    };
+
+    // ── Gallery ───────────────────────────────────────────────────────────────
+    const gallery = useMemo(() => {
+        const imgs: string[] = [];
+        if (selectedVariant?.gallery?.length) imgs.push(...selectedVariant.gallery);
+        if (selectedVariant?.image)           imgs.push(selectedVariant.image);
+        if (imgs.length === 0)                imgs.push(...allImages);
+        return [...new Set(imgs)].filter(Boolean);
+    }, [selectedVariant, allImages]);
+
+    // ── Price & stock ─────────────────────────────────────────────────────────
+    const currentPrice = useMemo(() => {
+        if (priceType === 'single') return displayPrice;
+        if (!selectedVariant)       return 0;
+        // Handle tiered pricing: pick the tier matching current quantity
+        if (selectedVariant.priceTiers?.length > 0) {
+            const tier = selectedVariant.priceTiers.find((t: any) => {
+                const start = parseInt(t.rangeStart) || 0;
+                const end   = t.rangeEnd === '' ? Infinity : (parseInt(t.rangeEnd) || Infinity);
+                return 1 >= start && 1 <= end;
+            });
+            if (tier) return parseFloat(tier.price) || 0;
+        }
+        return parseFloat(selectedVariant.price || '0') || 0;
+    }, [priceType, displayPrice, selectedVariant]);
+
+    const currentStock = useMemo(() => {
+        if (priceType === 'single') return singleStock;
+        if (!selectedVariant)       return 0;
+        return parseInt(selectedVariant.quantity || '0', 10) || 0;
+    }, [priceType, singleStock, selectedVariant]);
+
+    // ── Quantity ──────────────────────────────────────────────────────────────
+    const [quantity, setQuantity]   = useState(1);
+    const [noteValue, setNoteValue] = useState('');
+
+    const dec = () => setQuantity((q) => Math.max(1, q - 1));
+    const inc = () => setQuantity((q) => Math.min(currentStock || 9999, q + 1));
+
+    // ── Cart ──────────────────────────────────────────────────────────────────
+    const makeCartItem = (): CartItem => ({
+        productId:      data.id,
+        productSlug:    data.slug,
+        productTitle:   data.title,
+        productImage:   gallery[0] ?? '',
+        variantId:      selectedVariant?.id,
+        variantOptions: selectedVariant?.options,
+        sku:            selectedVariant?.sku,
+        price:          currentPrice,
+        quantity,
+    });
+
+    const handleAddToCart = () => {
+        if (priceType === 'variant' && !selectedVariant) {
+            error('Please select product options');
+            return;
+        }
+        addToCart(makeCartItem());
+        success(`Added ${quantity} × ${data.title} to cart`);
+        setQuantity(1);
+    };
+
+    const handleBuyNow = () => {
+        if (priceType === 'variant' && !selectedVariant) {
+            error('Please select product options');
+            return;
+        }
+        addToCart(makeCartItem());
+        window.location.href = '/checkout';
+    };
+
+    // ── Social ordering ───────────────────────────────────────────────────────
+    const buildMessage = (bold: boolean) => {
+        const b = (s: string) => bold ? `*${s}*` : s;
+        let msg = `Hi, I'd like to order:\n\n`;
+        msg += `${b('Product:')} ${data.title}\n`;
+        if (selectedVariant?.options) {
+            const opts = Object.entries(selectedVariant.options as Record<string, string>)
+                .map(([k, v]) => `${k}: ${v}`).join(', ');
+            msg += `${b('Options:')} ${opts}\n`;
+        }
+        if (selectedVariant?.sku) msg += `${b('SKU:')} ${selectedVariant.sku}\n`;
+        msg += `${b('Quantity:')} ${quantity}\n`;
+        if (currentPrice > 0) {
+            msg += `${b('Price:')} ${currencySymbol} ${fmtPrice(currentPrice)}\n`;
+            msg += `${b('Total:')} ${currencySymbol} ${fmtPrice(currentPrice * quantity)}\n`;
+        }
+        msg += `\nLink: ${window.location.href}`;
+        return msg;
+    };
+
+    const handleSocial = (platform: 'whatsapp' | 'messenger' | 'telegram') => {
+        if (priceType === 'variant' && !selectedVariant) {
+            error('Please select product options first');
+            return;
+        }
+        const encoded = encodeURIComponent(buildMessage(platform === 'whatsapp'));
+        if (platform === 'whatsapp')  window.open(`https://wa.me/${whatsappNumber}?text=${encoded}`, '_blank');
+        if (platform === 'messenger') window.open(`https://m.me/${facebookPageId}?text=${encoded}`, '_blank');
+        if (platform === 'telegram')  window.open(`https://t.me/${telegramUsername}?text=${encoded}`, '_blank');
+    };
+
+    const socialCount = [whatsappNumber, facebookPageId, telegramUsername].filter(Boolean).length;
+
+    // ── Shell props ───────────────────────────────────────────────────────────
+    const shellProps: ShellProps = {
+        data, priceType, regularPrice, hasDiscount, discountPercent,
+        currentPrice, currentStock, quantity, noteValue, setNoteValue,
+        dec, inc, setQuantity, gallery, attributes, selectedOptions,
+        selectedVariant, variantDisplayStyle, handleOptionSelect,
+        handleAddToCart, handleBuyNow, handleSocial, socialCount,
+        whatsappNumber, facebookPageId, telegramUsername,
+        shortDescription, orderNote, currencySymbol, variants,
+        categoryLinks,
+    };
+
+    // ── Render ────────────────────────────────────────────────────────────────
+    return (
+        <>
+            {layout === 1 ? <Layout1Shell {...shellProps} /> : <Layout2Shell {...shellProps} />}
+
+            {htmlDescription && (
+                <div className="container my-6 description"
+                    dangerouslySetInnerHTML={{ __html: htmlDescription }} />
+            )}
+
+            {(description || specifications.length > 0) && (
+                <div className="container my-8">
+                    <div className="flex flex-col md:flex-row gap-6">
+                        {description && (
+                            <div className="w-full md:w-2/3 bg-white p-4 md:p-6 rounded-2xl">
+                                <h2 className="text-xl font-semibold mb-4">Description</h2>
+                                <div className="prose max-w-none text-gray-700 description"
+                                    dangerouslySetInnerHTML={{ __html: description }} />
+                            </div>
+                        )}
+                        {specifications.length > 0 && (
+                            <div className={description ? 'w-full md:w-1/3' : 'w-full'}>
+                                <Specification specifications={specifications} />
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {compareIds.length > 0 && (
+                <div className="container my-8">
+                    <CompareSection
+                        currentId={data.id}
+                        currentSlug={data.slug}
+                        compareIds={compareIds}
+                        currencySymbol={currencySymbol}
+                    />
+                </div>
+            )}
+        </>
+    );
+}
+
+// ── Compare section ───────────────────────────────────────────────────────────
+
+function CompareSection({ currentId, currentSlug, compareIds, currencySymbol }: {
+    currentId: string; currentSlug: string; compareIds: string[]; currencySymbol: string;
+}) {
+    const sentinelRef = useRef<HTMLDivElement>(null);
+    const [compareData, setCompareData] = useState<{
+        current: any; compareProducts: any[]; categoryProducts: any[];
+    } | null>(null);
+    const [loading, setLoading] = useState(false);
+    const fetchedRef = useRef(false);
+
+    useEffect(() => {
+        const el = sentinelRef.current;
+        if (!el) return;
+        const observer = new IntersectionObserver(([entry]) => {
+            if (!entry.isIntersecting || fetchedRef.current) return;
+            fetchedRef.current = true;
+            setLoading(true);
+            fetch(`/api/compare?ids=${compareIds.join(',')}&current=${currentId}`, { cache: 'no-store' })
+                .then((r) => r.json())
+                .then((d) => setCompareData(d))
+                .catch(() => {})
+                .finally(() => setLoading(false));
+        }, { rootMargin: '200px' });
+        observer.observe(el);
+        return () => observer.disconnect();
+    }, [compareIds, currentId]);
+
+    return (
+        <div ref={sentinelRef}>
+            {loading && (
+                <div className="flex items-center justify-center py-12 text-gray-400 gap-2">
+                    <Icon icon="mdi:loading" width="24" height="24" className="animate-spin" />
+                    <span>Loading comparison…</span>
+                </div>
+            )}
+            {compareData && (
+                <Compare
+                    current={compareData.current}
+                    compareProducts={compareData.compareProducts}
+                    categoryProducts={compareData.categoryProducts}
+                    currencySymbol={currencySymbol}
+                    style={1}
+                />
+            )}
+        </div>
+    );
+}
+
+// ── Shared quantity stepper ───────────────────────────────────────────────────
+
+function QuantityStepper({ quantity, currentStock, dec, inc, setQuantity }: Pick<ShellProps, 'quantity' | 'currentStock' | 'dec' | 'inc' | 'setQuantity'>) {
+    return (
+        <div className="flex items-center border rounded-lg overflow-hidden w-fit">
+            <button type="button" onClick={dec} disabled={quantity <= 1} aria-label="Decrease quantity"
+                className="px-4 py-2.5 hover:bg-gray-100 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+                <Icon icon="mdi:minus" width="18" height="18" />
+            </button>
+            <input
+                type="text" inputMode="numeric" pattern="[0-9]*" value={quantity}
+                onChange={(e) => {
+                    const v = parseInt(e.target.value.replace(/\D/g, ''), 10) || 1;
+                    setQuantity(Math.min(Math.max(1, v), currentStock || 9999));
+                }}
+                className="w-14 text-center border-x py-2.5 focus:outline-none text-sm font-medium"
+                aria-label="Quantity"
+            />
+            <button type="button" onClick={inc}
+                disabled={currentStock > 0 && quantity >= currentStock}
+                aria-label="Increase quantity"
+                className="px-4 py-2.5 hover:bg-gray-100 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+                <Icon icon="mdi:plus" width="18" height="18" />
+            </button>
+        </div>
+    );
+}
+
+// ── Layout 1 Shell ────────────────────────────────────────────────────────────
+
+function Layout1Shell(props: ShellProps) {
+    const {
+        data, priceType, regularPrice, hasDiscount, discountPercent,
+        currentPrice, currentStock, quantity, noteValue, setNoteValue,
+        dec, inc, setQuantity, gallery, attributes, selectedOptions,
+        selectedVariant, variantDisplayStyle, handleOptionSelect,
+        handleAddToCart, handleBuyNow, handleSocial, socialCount,
+        whatsappNumber, facebookPageId, telegramUsername,
+        shortDescription, orderNote, currencySymbol, variants,
+        categoryLinks,
+    } = props;
+
+    const inStock = currentStock > 0;
+
+    return (
+        <div className="container my-8">
+            <div className="grid grid-cols-1 md:grid-cols-3 md:items-start gap-6 bg-white p-3 md:p-6 rounded-2xl">
+
+                {/* ── Image column ── */}
+                <div className="w-full md:sticky md:top-4">
+                    <Slider gallery={gallery} alt={data.title} />
+                </div>
+
+                {/* ── Info column ── */}
+                <div className="md:col-span-2 flex flex-col gap-4">
+11
+                    {/* Category breadcrumb */}
+                    {categoryLinks.length > 0 && (
+                        <nav aria-label="Category breadcrumb"
+                            className="flex items-center gap-1.5 flex-wrap text-sm text-gray-500">
+                            <Icon icon="mdi:tag-outline" width="15" height="15" className="shrink-0" />
+                            {categoryLinks.map((cat, i) => (
+                                <span key={cat.url} className="flex items-center gap-1.5">
+                                    <Link href={cat.url}
+                                        className="hover:text-main transition-colors font-medium">
+                                        {cat.title}
+                                    </Link>
+                                    {i < categoryLinks.length - 1 && (
+                                        <Icon icon="mdi:chevron-right" width="14" height="14" className="text-gray-300 shrink-0" />
+                                    )}
+                                </span>
+                            ))}
+                        </nav>
+                    )}
+
+                    {/* Title — always shown */}
+                    <h1 className="text-xl md:text-3xl font-bold">{data.title}</h1>
+
+                    {/* Short description */}
+                    {shortDescription && (
+                        <div className="text-gray-600 description"
+                            dangerouslySetInnerHTML={{ __html: shortDescription }} />
+                    )}
+
+                    {/* Price — only when > 0 */}
+                    {currentPrice > 0 && (
+                        <div className="flex items-center gap-3 flex-wrap">
+                            {hasDiscount && regularPrice > 0 && (
+                                <>
+                                    <span className="text-lg text-gray-400 line-through">
+                                        {currencySymbol}&nbsp;{fmtPrice(regularPrice)}
+                                    </span>
+                                    <span className="bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded">
+                                        {discountPercent}% OFF
+                                    </span>
+                                </>
+                            )}
+                            <span className="text-3xl font-bold text-main">
+                                {currencySymbol}&nbsp;{fmtPrice(currentPrice)}
+                            </span>
+                        </div>
+                    )}
+
+                    {/* Variant selector — always shown when variants exist */}
+                    {priceType === 'variant' && variants.length > 0 && (
+                        <Variant
+                            info={{ variants, selectedAttributes: [], variantDisplayStyle }}
+                            attributes={attributes}
+                            selectedOptions={selectedOptions}
+                            selectedVariant={selectedVariant}
+                            onOptionSelect={handleOptionSelect}
+                            currencySymbol={currencySymbol}
+                        />
+                    )}
+
+                    {/* Order note */}
+                    {orderNote && (
+                        <div>
+                            <label className="block text-sm font-medium mb-1">{orderNote}</label>
+                            <textarea rows={3} value={noteValue}
+                                onChange={(e) => setNoteValue(e.target.value)}
+                                placeholder="Add a note for this order (optional)"
+                                className="w-full px-4 py-2 border rounded-lg text-sm resize-none focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                        </div>
+                    )}
+
+                    {/* Stock badge — always shown */}
+                    {inStock ? (
+                        <span className="inline-flex items-center gap-1.5 text-sm text-green-600">
+                            <Icon icon="mdi:package-variant-closed-check" width="18" height="18" />
+                            {currentStock} in stock
+                        </span>
+                    ) : (
+                        <span className="text-sm text-red-500 font-medium">Out of stock</span>
+                    )}
+
+                    {/* Quantity — always shown */}
+                    <div>
+                        <p className="text-sm font-medium mb-2">Quantity</p>
+                        <QuantityStepper quantity={quantity} currentStock={currentStock}
+                            dec={dec} inc={inc} setQuantity={setQuantity} />
+                    </div>
+
+                    {/* Cart buttons — always shown */}
+                    <div className="grid grid-cols-2 gap-2">
+                        <button type="button" onClick={handleAddToCart} disabled={!inStock}
+                            className="w-full py-3 rounded-lg bg-main text-white font-semibold hover:bg-main/80 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors">
+                            {inStock ? 'Add to Cart' : 'Out of Stock'}
+                        </button>
+                        <button type="button" onClick={handleBuyNow} disabled={!inStock}
+                            className="w-full py-3 rounded-lg bg-gray-700 text-white font-semibold hover:bg-gray-800 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2">
+                            <Icon icon="mdi:lightning-bolt" width="18" height="18" />
+                            {inStock ? 'Buy Now' : 'Out of Stock'}
+                        </button>
+                    </div>
+
+                    {/* Social buttons */}
+                    {socialCount > 0 && (
+                        <div className="grid gap-2"
+                            style={{ gridTemplateColumns: `repeat(${socialCount}, minmax(0, 1fr))` }}>
+                            {whatsappNumber && (
+                                <button type="button" onClick={() => handleSocial('whatsapp')} disabled={!inStock}
+                                    className="w-full py-3 rounded-lg bg-[#25D366] text-white font-semibold hover:bg-[#20BA5A] disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 text-sm">
+                                    <Icon icon="mdi:whatsapp" width="20" height="20" />
+                                    Order via WhatsApp
+                                </button>
+                            )}
+                            {facebookPageId && (
+                                <button type="button" onClick={() => handleSocial('messenger')} disabled={!inStock}
+                                    className="w-full py-3 rounded-lg bg-[#0084FF] text-white font-semibold hover:bg-[#0073E6] disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 text-sm">
+                                    <Icon icon="mdi:facebook-messenger" width="20" height="20" />
+                                    Order via Messenger
+                                </button>
+                            )}
+                            {telegramUsername && (
+                                <button type="button" onClick={() => handleSocial('telegram')} disabled={!inStock}
+                                    className="w-full py-3 rounded-lg bg-[#0088cc] text-white font-semibold hover:bg-[#0077b5] disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2 text-sm">
+                                    <Icon icon="mdi:telegram" width="20" height="20" />
+                                    Order via Telegram
+                                </button>
+                            )}
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// ── Layout 2 Shell ────────────────────────────────────────────────────────────
+
+function Layout2Shell(props: ShellProps) {
+    const {
+        data, priceType, regularPrice, hasDiscount, discountPercent,
+        currentPrice, currentStock, quantity, noteValue, setNoteValue,
+        dec, inc, setQuantity, gallery, attributes, selectedOptions,
+        selectedVariant, variantDisplayStyle, handleOptionSelect,
+        handleAddToCart, handleBuyNow, handleSocial, socialCount,
+        whatsappNumber, facebookPageId, telegramUsername,
+        shortDescription, orderNote, currencySymbol, variants,
+    } = props;
+
+    const inStock = currentStock > 0;
+
+    return (
+        <div className="bg-[#0a0c10]">
+            <div className="relative overflow-hidden">
+                <div className="absolute inset-0 pointer-events-none">
+                    <div className="absolute top-0 left-1/4 w-96 h-96 rounded-full bg-emerald-500/10 blur-3xl" />
+                    <div className="absolute bottom-0 right-1/4 w-80 h-80 rounded-full bg-teal-500/10 blur-3xl" />
+                </div>
+
+                <div className="relative container py-10">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:items-start">
+
+                        {/* Image column */}
+                        <div className="md:sticky md:top-4">
+                            <Slider gallery={gallery} alt={data.title} aspectClass="aspect-square" />
+                        </div>
+
+                        {/* Info column */}
+                        <div className="flex flex-col gap-5">
+
+                            <h1 className="text-3xl md:text-4xl font-extrabold text-white leading-tight">
+                                {data.title}
+                            </h1>
+
+                            {shortDescription && (
+                                <div className="text-gray-400 description text-sm leading-relaxed"
+                                    dangerouslySetInnerHTML={{ __html: shortDescription }} />
+                            )}
+
+                            {/* Price */}
+                            {currentPrice > 0 && (
+                                <div className="flex items-center gap-3 flex-wrap">
+                                    {hasDiscount && regularPrice > 0 && (
+                                        <>
+                                            <span className="text-lg text-gray-500 line-through">
+                                                {currencySymbol}&nbsp;{fmtPrice(regularPrice)}
+                                            </span>
+                                            <span className="bg-emerald-500 text-white text-xs font-bold px-2 py-0.5 rounded">
+                                                {discountPercent}% OFF
+                                            </span>
+                                        </>
+                                    )}
+                                    <span className="text-4xl font-black text-emerald-400 tabular-nums">
+                                        {currencySymbol}&nbsp;{fmtPrice(currentPrice)}
+                                    </span>
+                                </div>
+                            )}
+
+                            {/* Variant selector */}
+                            {priceType === 'variant' && variants.length > 0 && (
+                                <div className="text-white">
+                                    <Variant
+                                        info={{ variants, selectedAttributes: [], variantDisplayStyle }}
+                                        attributes={attributes}
+                                        selectedOptions={selectedOptions}
+                                        selectedVariant={selectedVariant}
+                                        onOptionSelect={handleOptionSelect}
+                                        currencySymbol={currencySymbol}
+                                    />
+                                </div>
+                            )}
+
+                            {/* Order note */}
+                            {orderNote && (
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-300 mb-1">{orderNote}</label>
+                                    <textarea rows={3} value={noteValue}
+                                        onChange={(e) => setNoteValue(e.target.value)}
+                                        placeholder="Add a note (optional)"
+                                        className="w-full px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-gray-200 resize-none focus:outline-none focus:ring-2 focus:ring-emerald-500 placeholder-gray-600" />
+                                </div>
+                            )}
+
+                            {/* Stock */}
+                            {inStock ? (
+                                <span className="inline-flex items-center gap-1.5 text-sm text-emerald-400">
+                                    <Icon icon="mdi:package-variant-closed-check" width="18" height="18" />
+                                    {currentStock} in stock
+                                </span>
+                            ) : (
+                                <span className="text-sm text-red-400 font-medium">Out of stock</span>
+                            )}
+
+                            {/* Quantity */}
+                            <div>
+                                <p className="text-sm font-medium text-gray-300 mb-2">Quantity</p>
+                                <div className="border border-white/10 rounded-lg w-fit overflow-hidden flex">
+                                    <button type="button" onClick={dec} disabled={quantity <= 1}
+                                        className="px-4 py-2.5 text-gray-300 hover:bg-white/10 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+                                        <Icon icon="mdi:minus" width="18" height="18" />
+                                    </button>
+                                    <input type="text" inputMode="numeric" value={quantity}
+                                        onChange={(e) => {
+                                            const v = parseInt(e.target.value.replace(/\D/g, ''), 10) || 1;
+                                            setQuantity(Math.min(Math.max(1, v), currentStock || 9999));
+                                        }}
+                                        className="w-14 text-center bg-transparent border-x border-white/10 py-2.5 text-white text-sm focus:outline-none" />
+                                    <button type="button" onClick={inc}
+                                        disabled={currentStock > 0 && quantity >= currentStock}
+                                        className="px-4 py-2.5 text-gray-300 hover:bg-white/10 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+                                        <Icon icon="mdi:plus" width="18" height="18" />
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* Cart buttons */}
+                            <div className="grid grid-cols-2 gap-3">
+                                <button type="button" onClick={handleAddToCart} disabled={!inStock}
+                                    className="py-3.5 rounded-xl bg-emerald-500 text-white font-bold hover:bg-emerald-400 disabled:opacity-40 disabled:cursor-not-allowed transition shadow-lg shadow-emerald-900/50">
+                                    {inStock ? 'Add to Cart' : 'Out of Stock'}
+                                </button>
+                                <button type="button" onClick={handleBuyNow} disabled={!inStock}
+                                    className="py-3.5 rounded-xl border border-emerald-500/40 text-emerald-400 font-bold hover:bg-emerald-500/10 disabled:opacity-40 disabled:cursor-not-allowed transition flex items-center justify-center gap-2">
+                                    <Icon icon="mdi:lightning-bolt" width="18" height="18" />
+                                    {inStock ? 'Buy Now' : 'Out of Stock'}
+                                </button>
+                            </div>
+
+                            {/* Social buttons */}
+                            {socialCount > 0 && (
+                                <div className="grid gap-2"
+                                    style={{ gridTemplateColumns: `repeat(${socialCount}, minmax(0, 1fr))` }}>
+                                    {whatsappNumber && (
+                                        <button type="button" onClick={() => handleSocial('whatsapp')} disabled={!inStock}
+                                            className="py-3 rounded-xl bg-[#25D366] text-white font-semibold hover:bg-[#20BA5A] disabled:opacity-40 transition flex items-center justify-center gap-2 text-sm">
+                                            <Icon icon="mdi:whatsapp" width="20" height="20" /> WhatsApp
+                                        </button>
+                                    )}
+                                    {facebookPageId && (
+                                        <button type="button" onClick={() => handleSocial('messenger')} disabled={!inStock}
+                                            className="py-3 rounded-xl bg-[#0084FF] text-white font-semibold hover:bg-[#0073E6] disabled:opacity-40 transition flex items-center justify-center gap-2 text-sm">
+                                            <Icon icon="mdi:facebook-messenger" width="20" height="20" /> Messenger
+                                        </button>
+                                    )}
+                                    {telegramUsername && (
+                                        <button type="button" onClick={() => handleSocial('telegram')} disabled={!inStock}
+                                            className="py-3 rounded-xl bg-[#0088cc] text-white font-semibold hover:bg-[#0077b5] disabled:opacity-40 transition flex items-center justify-center gap-2 text-sm">
+                                            <Icon icon="mdi:telegram" width="20" height="20" /> Telegram
+                                        </button>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
