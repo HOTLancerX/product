@@ -1,7 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getOrdersCollection, initializeOrdersCollection } from '@/plugin/product/models/Order';
+import { EXPRESS_API, LICENSE_KEY } from '@/lib/express';
 
-export const dynamic = 'force-dynamic';
+async function resolveUser(req: NextRequest): Promise<{ userId: string; userType: string } | null> {
+    try {
+        const res = await fetch(`${EXPRESS_API}/auth/me`, {
+            headers: {
+                'Content-Type': 'application/json',
+                'x-license-key': LICENSE_KEY,
+                'cookie': req.headers.get('cookie') ?? '',
+            },
+        });
+        if (!res.ok) return null;
+        const data = await res.json();
+        const user = data.user ?? data;
+        if (!user?._id) return null;
+        return { userId: String(user._id), userType: user.type ?? 'user' };
+    } catch {
+        return null;
+    }
+}
 
 /**
  * GET /api/orders/:orderNumber
@@ -24,18 +42,8 @@ export async function GET(
         // Resolve caller (optional — guests can view their own confirmation)
         let userId: string | null = null;
         let userType = 'user';
-        try {
-            const sessionCookie = req.cookies.get('session');
-            if (sessionCookie) {
-                const sessionData = JSON.parse(
-                    Buffer.from(sessionCookie.value, 'base64').toString()
-                );
-                userId   = sessionData.userId ?? null;
-                userType = sessionData.type   ?? 'user';
-            }
-        } catch {
-            // guest
-        }
+        const caller = await resolveUser(req);
+        if (caller) { userId = caller.userId; userType = caller.userType; }
 
         await initializeOrdersCollection();
         const collection = await getOrdersCollection();
@@ -77,18 +85,10 @@ export async function PUT(
         let userId   = 'unknown';
         let userName = 'Admin';
         let userType = 'user';
-        try {
-            const sessionCookie = req.cookies.get('session');
-            if (sessionCookie) {
-                const sessionData = JSON.parse(
-                    Buffer.from(sessionCookie.value, 'base64').toString()
-                );
-                userId   = sessionData.userId ?? 'unknown';
-                userType = sessionData.type   ?? 'user';
-                userName = sessionData.name   ?? 'Admin';
-            }
-        } catch {
-            // unauthenticated
+        const caller = await resolveUser(req);
+        if (caller) {
+            userId   = caller.userId;
+            userType = caller.userType;
         }
 
         const isAdmin = userType === 'admin' || userType === 'superadmin';

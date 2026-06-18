@@ -24,22 +24,28 @@ export default function CheckoutPage() {
     const { settings } = useSettings();
     const currencySymbol = settings?.currency_symbol || '';
 
-    const checkoutFields: Array<{ key: string; name: string; desktop: string; mobile: string; required: boolean; status: boolean }> =
-        settings?.checkout_fields || [
-            { key: "name", name: "Full Name", desktop: "w-1/2", mobile: "w-full", required: true, status: true },
-            { key: "phone", name: "Phone Number", desktop: "w-1/2", mobile: "w-full", required: true, status: true },
-            { key: "email", name: "Email", desktop: "w-full", mobile: "w-full", required: false, status: true },
-            { key: "address", name: "Address", desktop: "w-full", mobile: "w-full", required: false, status: true },
-            { key: "state", name: "State / Province", desktop: "w-1/2", mobile: "w-full", required: false, status: true },
-            { key: "city", name: "City", desktop: "w-1/2", mobile: "w-full", required: false, status: true },
-            { key: "zipCode", name: "Zip Code", desktop: "w-1/2", mobile: "w-full", required: false, status: true },
-            { key: "shippingMethod", name: "Shipping Method", desktop: "w-full", mobile: "w-full", required: true, status: true },
-            { key: "paymentMethod", name: "Payment Method", desktop: "w-full", mobile: "w-full", required: true, status: true },
-            { key: "transactionId", name: "Transaction ID", desktop: "w-1/2", mobile: "w-full", required: false, status: true },
-            { key: "paymentInfo", name: "Payment Details", desktop: "w-1/2", mobile: "w-full", required: false, status: true },
-            { key: "proofImage", name: "Payment Screenshot", desktop: "w-full", mobile: "w-full", required: false, status: true },
-            { key: "notes", name: "Order Notes", desktop: "w-full", mobile: "w-full", required: false, status: true },
-        ]
+    const checkoutFields: Array<{ key: string; name: string; desktop: string; mobile: string; required: boolean; status: boolean }> = (() => {
+        const raw = settings?.checkout_fields;
+        if (Array.isArray(raw)) return raw;
+        if (typeof raw === 'string') {
+            try { return JSON.parse(raw); } catch { /* fall through */ }
+        }
+        return [
+            { key: "name",           name: "Full Name",           desktop: "w-1/2",  mobile: "w-full", required: true,  status: true },
+            { key: "phone",          name: "Phone Number",         desktop: "w-1/2",  mobile: "w-full", required: true,  status: true },
+            { key: "email",          name: "Email",                desktop: "w-full", mobile: "w-full", required: false, status: true },
+            { key: "address",        name: "Address",              desktop: "w-full", mobile: "w-full", required: false, status: true },
+            { key: "state",          name: "State / Province",     desktop: "w-1/2",  mobile: "w-full", required: false, status: true },
+            { key: "city",           name: "City",                 desktop: "w-1/2",  mobile: "w-full", required: false, status: true },
+            { key: "zipCode",        name: "Zip Code",             desktop: "w-1/2",  mobile: "w-full", required: false, status: true },
+            { key: "shippingMethod", name: "Shipping Method",      desktop: "w-full", mobile: "w-full", required: true,  status: true },
+            { key: "paymentMethod",  name: "Payment Method",       desktop: "w-full", mobile: "w-full", required: true,  status: true },
+            { key: "transactionId",  name: "Transaction ID",       desktop: "w-1/2",  mobile: "w-full", required: false, status: true },
+            { key: "paymentInfo",    name: "Payment Details",      desktop: "w-1/2",  mobile: "w-full", required: false, status: true },
+            { key: "proofImage",     name: "Payment Screenshot",   desktop: "w-full", mobile: "w-full", required: false, status: true },
+            { key: "notes",          name: "Order Notes",          desktop: "w-full", mobile: "w-full", required: false, status: true },
+        ];
+    })();
 
     const fieldCfg = (key: string) => checkoutFields.find(f => f.key === key) || { status: true, required: false, desktop: "w-1/2", mobile: "w-full" }
     const fieldVisible = (key: string) => fieldCfg(key).status !== false

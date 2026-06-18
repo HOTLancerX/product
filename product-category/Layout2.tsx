@@ -62,7 +62,7 @@ export default function ProductCategoryLayout2({
                     backgroundPosition: 'center',
                 } : undefined}
             >
-                <div className="absolute inset-0 bg-gradient-to-r from-[#0a0c10]/90 via-[#0a0c10]/60 to-transparent" />
+                <div className="absolute inset-0 bg-linear-to-r from-[#0a0c10]/90 via-[#0a0c10]/60 to-transparent" />
                 <div className="absolute top-0 right-0 w-96 h-96 rounded-full bg-emerald-500/10 blur-3xl pointer-events-none" />
 
                 <div className="relative max-w-6xl mx-auto">

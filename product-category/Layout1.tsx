@@ -62,7 +62,7 @@ export default function ProductCategoryLayout1({
 
             {/* ── Banner ── */}
             <header
-                className="relative bg-gradient-to-r from-emerald-600 to-teal-600 py-12 px-6 overflow-hidden"
+                className="relative bg-linear-to-r from-emerald-600 to-teal-600 py-12 px-6 overflow-hidden"
                 style={catImage ? {
                     backgroundImage: `url(${catImage})`,
                     backgroundSize: 'cover',

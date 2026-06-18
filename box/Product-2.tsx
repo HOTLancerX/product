@@ -150,7 +150,7 @@ export default function ProductBox2({ data, productUrl, currencySymbol = '$' }: 
     };
 
     return (
-        <div className="group relative rounded-2xl overflow-hidden bg-gray-900 aspect-[3/4] flex flex-col cursor-pointer shadow-sm hover:shadow-xl transition-shadow">
+        <div className="group relative rounded-2xl overflow-hidden bg-gray-900 aspect-3/4 flex flex-col cursor-pointer shadow-sm hover:shadow-xl transition-shadow">
 
             {/* Discount badge */}
             {hasDiscount && (
@@ -184,7 +184,7 @@ export default function ProductBox2({ data, productUrl, currencySymbol = '$' }: 
             </Link>
 
             {/* Gradient overlay — always visible at bottom */}
-            <div className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-black/90 via-black/40 to-transparent z-10 pointer-events-none" />
+            <div className="absolute inset-x-0 bottom-0 h-2/3 bg-linear-to-t from-black/90 via-black/40 to-transparent z-10 pointer-events-none" />
 
             {/* Info — sits above gradient */}
             <div className="relative z-20 mt-auto p-3 flex flex-col gap-2">
