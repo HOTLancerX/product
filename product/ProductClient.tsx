@@ -97,23 +97,25 @@ interface CartItem {
     sku?: string;
     price: number;
     quantity: number;
+    maxQuantity: number;
+    shippingInside?: number;
+    shippingOutside?: number;
 }
 
 function addToCart(item: CartItem) {
-    if (typeof window !== 'undefined' && typeof (window as any).__cmsAddToCart === 'function') {
-        (window as any).__cmsAddToCart(item);
-        return;
-    }
     try {
-        const raw  = localStorage.getItem('cms_cart');
+        const raw  = localStorage.getItem('shopping_cart');
         const cart: CartItem[] = raw ? JSON.parse(raw) : [];
         const idx  = cart.findIndex(
             (c) => c.productId === item.productId && c.variantId === item.variantId
         );
-        if (idx >= 0) cart[idx].quantity += item.quantity;
-        else           cart.push(item);
-        localStorage.setItem('cms_cart', JSON.stringify(cart));
-        window.dispatchEvent(new Event('cms_cart_updated'));
+        if (idx >= 0) {
+            cart[idx].quantity = Math.min(cart[idx].quantity + item.quantity, item.maxQuantity);
+        } else {
+            cart.push(item);
+        }
+        localStorage.setItem('shopping_cart', JSON.stringify(cart));
+        window.dispatchEvent(new Event('cartUpdated'));
     } catch { /* localStorage unavailable */ }
 }
 
@@ -261,6 +263,7 @@ export default function ProductClient({
         sku:            selectedVariant?.sku,
         price:          currentPrice,
         quantity,
+        maxQuantity:    currentStock || 9999,
     });
 
     const handleAddToCart = () => {

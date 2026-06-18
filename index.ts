@@ -9,6 +9,8 @@ import PostSpecification from "./variate/PostSpecification";
 import ProductSettingsPage from "./settings/ProductSettingsPage";
 import ProductBox1 from "./box/Product-1";
 import ProductBox2 from "./box/Product-2";
+import Header4 from "./header/Header1";
+import CheckoutPage from "./checkout/page";
 // NOTE: lib/category.ts is NOT imported here — it imports Mongoose models
 // and would pollute the client bundle via the plugin registry chain.
 // Instead, we register a lazy wrapper below that only resolves the import
@@ -311,6 +313,16 @@ export function register() {
             active: false,
             component: ProductLayout2,
         },
+        {
+            key: "header",
+            label: "Header Layout 5",
+            type: "header",
+            slug: "layout",
+            style: "left",
+            position: 10,
+            active: true,           // first-boot default
+            component: Header4,
+        },
     ], PLUGINS.nx);
 
     // ─── Product category page templates ───────────────────────────────────
@@ -463,6 +475,82 @@ export function register() {
             style: "left",
             position: 60,
             component: Text,
+        },
+    ], PLUGINS.nx);
+
+    // ─── Shipping settings form fields ──────────────────────────────────────
+    // type: "product-shipping" → shown on the Shipping tab of product settings.
+    addHook("setting.form", [
+        {
+            key: "shipping_inside_rate",
+            label: "Shipping Rate — Inside (default per item)",
+            type: "product-shipping",
+            style: "left",
+            position: 10,
+            component: Text,
+        },
+        {
+            key: "shipping_outside_rate",
+            label: "Shipping Rate — Outside (default per item)",
+            type: "product-shipping",
+            style: "left",
+            position: 20,
+            component: Text,
+        },
+        {
+            key: "shipping_inside_label",
+            label: "Inside Shipping Label",
+            type: "product-shipping",
+            style: "left",
+            position: 30,
+            component: Text,
+        },
+        {
+            key: "shipping_outside_label",
+            label: "Outside Shipping Label",
+            type: "product-shipping",
+            style: "left",
+            position: 40,
+            component: Text,
+        },
+        {
+            key: "product_free_shipping_min",
+            label: "Free Shipping Minimum Order Amount",
+            type: "product-shipping",
+            style: "right",
+            position: 10,
+            component: Text,
+        },
+        {
+            key: "shipping_estimated_days_inside",
+            label: "Estimated Delivery Days — Inside",
+            type: "product-shipping",
+            style: "right",
+            position: 20,
+            component: Text,
+        },
+        {
+            key: "shipping_estimated_days_outside",
+            label: "Estimated Delivery Days — Outside",
+            type: "product-shipping",
+            style: "right",
+            position: 30,
+            component: Text,
+        },
+    ], PLUGINS.nx);
+
+    // ─── Checkout static page (root.pages single) ──────────────────────────
+    // Registers /checkout as a static single page resolved by the slug router.
+    addHook("root.pages", [
+        {
+            key: "checkout",
+            label: "Checkout",
+            type: "single",
+            slug: "single",
+            style: "left",
+            position: 10,
+            active: true,
+            component: CheckoutPage,
         },
     ], PLUGINS.nx);
 }

@@ -41,20 +41,20 @@ function fmtPrice(n: number): string {
 }
 
 function addToCart(item: Record<string, unknown>) {
-    if (typeof window !== 'undefined' && typeof (window as any).__cmsAddToCart === 'function') {
-        (window as any).__cmsAddToCart(item);
-        return;
-    }
     try {
-        const raw  = localStorage.getItem('cms_cart');
+        const raw  = localStorage.getItem('shopping_cart');
         const cart: any[] = raw ? JSON.parse(raw) : [];
         const idx  = cart.findIndex(
             (c: any) => c.productId === item.productId && c.variantId === item.variantId
         );
-        if (idx >= 0) cart[idx].quantity = (cart[idx].quantity ?? 0) + 1;
-        else           cart.push({ ...item, quantity: 1 });
-        localStorage.setItem('cms_cart', JSON.stringify(cart));
-        window.dispatchEvent(new Event('cms_cart_updated'));
+        const maxQty = (item.maxQuantity as number) ?? 9999;
+        if (idx >= 0) {
+            cart[idx].quantity = Math.min((cart[idx].quantity ?? 0) + 1, maxQty);
+        } else {
+            cart.push({ ...item, quantity: 1 });
+        }
+        localStorage.setItem('shopping_cart', JSON.stringify(cart));
+        window.dispatchEvent(new Event('cartUpdated'));
     } catch { /* localStorage unavailable */ }
 }
 
@@ -145,6 +145,7 @@ export default function ProductBox2({ data, productUrl, currencySymbol = '$' }: 
             variantOptions: firstVariant?.options,
             sku:            firstVariant?.sku,
             price:          currentPrice || parseFloat(firstVariant?.price || '0') || 0,
+            maxQuantity:    stock || parseInt(firstVariant?.quantity || '0', 10) || 9999,
         });
     };
 

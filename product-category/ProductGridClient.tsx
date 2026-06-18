@@ -46,8 +46,6 @@ export default function ProductGridClient({
     const [BoxComponent, setBoxComponent] = useState<any>(null);
 
     useEffect(() => {
-        // Hook registry is populated after useActivePlugins runs reregisterHooks.
-        // getHooks("root.pages") returns all registered root.pages entries.
         if (activePlugins === null) return;
 
         const boxes = getHooks('root.pages').filter(
@@ -62,7 +60,6 @@ export default function ProductGridClient({
             )?.component ?? null;
         }
 
-        // Fallback: plugin-declared active box → first registered
         if (!match) {
             match = (boxes.find(b => b.active === true) ?? boxes[0])?.component ?? null;
         }
@@ -70,7 +67,7 @@ export default function ProductGridClient({
         setBoxComponent(() => match);
     }, [activePlugins, activeBox]);
 
-    // Still loading hooks
+    // ── Loading skeleton ──────────────────────────────────────────────────────
     if (activePlugins === null) {
         return (
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-5">
@@ -87,6 +84,7 @@ export default function ProductGridClient({
         );
     }
 
+    // ── Empty state ───────────────────────────────────────────────────────────
     if (products.length === 0) {
         return (
             <div className="text-center py-20 text-gray-400">
@@ -96,6 +94,7 @@ export default function ProductGridClient({
         );
     }
 
+    // ── Box component grid ────────────────────────────────────────────────────
     if (BoxComponent) {
         return (
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-5">
@@ -111,7 +110,7 @@ export default function ProductGridClient({
         );
     }
 
-    // Fallback plain grid
+    // ── Fallback plain grid ───────────────────────────────────────────────────
     return (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-5">
             {products.map(product => (
