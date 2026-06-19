@@ -11,6 +11,13 @@ import ProductBox1 from "./box/Product-1";
 import ProductBox2 from "./box/Product-2";
 import Header4 from "./header/Header1";
 import CheckoutPage from "./checkout/page";
+import AdminOrdersPage from "./orders/page";
+import AdminOrderDetailPage from "./orders/details";
+import PendingOrdersPage    from "./orders/pending/page";
+import ProcessingOrdersPage from "./orders/processing/page";
+import ShippedOrdersPage    from "./orders/shipped/page";
+import DeliveredOrdersPage  from "./orders/delivered/page";
+import CancelledOrdersPage  from "./orders/cancelled/page";
 // NOTE: lib/category.ts is NOT imported here — it imports Mongoose models
 // and would pollute the client bundle via the plugin registry chain.
 // Instead, we register a lazy wrapper below that only resolves the import
@@ -375,8 +382,56 @@ export function register() {
         },
     ], PLUGINS.nx);
 
-    // ─── Product admin nav: settings link ──────────────────────────────────
+    // ─── Orders nav — top-level parent + status sub-items ──────────────────
     addHook("admin.nav", [
+        {
+            key: "orders",
+            label: "Orders",
+            icon: "solar:receipt-bold",
+            slug: "orders",
+            parent: "",
+            position: 14,
+        },
+        {
+            key: "orders-pending",
+            label: "Pending",
+            icon: "mdi:clock-outline",
+            slug: "orders/pending",
+            parent: "orders",
+            position: 2,
+        },
+        {
+            key: "orders-processing",
+            label: "Processing",
+            icon: "mdi:cog-outline",
+            slug: "orders/processing",
+            parent: "orders",
+            position: 3,
+        },
+        {
+            key: "orders-shipped",
+            label: "Shipped",
+            icon: "mdi:truck-delivery-outline",
+            slug: "orders/shipped",
+            parent: "orders",
+            position: 4,
+        },
+        {
+            key: "orders-delivered",
+            label: "Delivered",
+            icon: "mdi:check-circle-outline",
+            slug: "orders/delivered",
+            parent: "orders",
+            position: 5,
+        },
+        {
+            key: "orders-cancelled",
+            label: "Cancelled",
+            icon: "mdi:close-circle-outline",
+            slug: "orders/cancelled",
+            parent: "orders",
+            position: 6,
+        },
         {
             key: "product-settings",
             label: "Product Settings",
@@ -392,11 +447,67 @@ export function register() {
     // Completely isolated — only fields with type "product-settings" appear.
     addHook("admin.pages", [
         {
+            key: "orders",
+            label: "All Orders",
+            type: "product-orders",
+            style: "left",
+            position: 10,
+            path: AdminOrdersPage,
+        },
+        {
+            key: "orders/",
+            label: "Order Detail",
+            type: "product-orders",
+            style: "left",
+            position: 11,
+            path: AdminOrderDetailPage,
+        },
+        {
+            key: "orders/pending",
+            label: "Pending Orders",
+            type: "product-orders",
+            style: "left",
+            position: 12,
+            path: PendingOrdersPage,
+        },
+        {
+            key: "orders/processing",
+            label: "Processing Orders",
+            type: "product-orders",
+            style: "left",
+            position: 13,
+            path: ProcessingOrdersPage,
+        },
+        {
+            key: "orders/shipped",
+            label: "Shipped Orders",
+            type: "product-orders",
+            style: "left",
+            position: 14,
+            path: ShippedOrdersPage,
+        },
+        {
+            key: "orders/delivered",
+            label: "Delivered Orders",
+            type: "product-orders",
+            style: "left",
+            position: 15,
+            path: DeliveredOrdersPage,
+        },
+        {
+            key: "orders/cancelled",
+            label: "Cancelled Orders",
+            type: "product-orders",
+            style: "left",
+            position: 16,
+            path: CancelledOrdersPage,
+        },
+        {
             key: "product/settings",
             label: "Product Settings",
             type: "product-settings",
             style: "left",
-            position: 10,
+            position: 20,
             path: ProductSettingsPage,
         },
     ], PLUGINS.nx);

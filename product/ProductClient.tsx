@@ -478,7 +478,6 @@ function Layout1Shell(props: ShellProps) {
 
                 {/* ── Info column ── */}
                 <div className="md:col-span-2 flex flex-col gap-4">
-11
                     {/* Category breadcrumb */}
                     {categoryLinks.length > 0 && (
                         <nav aria-label="Category breadcrumb"
