@@ -1,35 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getOrdersCollection, initializeOrdersCollection } from '@/plugin/product/models/Order';
-import { EXPRESS_API, LICENSE_KEY } from '@/lib/express';
-import { ObjectId } from 'mongodb';
+import { resolveUser } from '@/lib/session';
+import mongoose from 'mongoose';
 
 export const dynamic = 'force-dynamic';
 
-async function resolveUser(req: NextRequest): Promise<{ userId: string; userType: string } | null> {
-    try {
-        const res = await fetch(`${EXPRESS_API}/auth/me`, {
-            headers: {
-                'Content-Type': 'application/json',
-                'x-license-key': LICENSE_KEY,
-                'cookie': req.headers.get('cookie') ?? '',
-            },
-        });
-        if (!res.ok) return null;
-        const data = await res.json();
-        const user = data.user ?? data;
-        if (!user?._id) return null;
-        return { userId: String(user._id), userType: user.type ?? 'user' };
-    } catch {
-        return null;
-    }
-}
-
-/**
- * GET /api/orders/id/:id
- *
- * Fetch a single order by its MongoDB _id.
- * Admin only — this endpoint is used by the admin detail page.
- */
+/** GET /api/orders/id/:id — fetch by MongoDB _id, admin only */
 export async function GET(
     req: NextRequest,
     { params }: { params: Promise<{ id: string }> }
@@ -37,7 +13,7 @@ export async function GET(
     try {
         const { id } = await params;
 
-        if (!id || !ObjectId.isValid(id)) {
+        if (!id || !mongoose.isValidObjectId(id)) {
             return NextResponse.json({ error: 'Invalid order ID' }, { status: 400 });
         }
 
@@ -51,7 +27,7 @@ export async function GET(
         await initializeOrdersCollection();
         const collection = await getOrdersCollection();
 
-        const order = await collection.findOne({ _id: new ObjectId(id) });
+        const order = await collection.findOne({ _id: new mongoose.Types.ObjectId(id) });
         if (!order) {
             return NextResponse.json({ error: 'Order not found' }, { status: 404 });
         }

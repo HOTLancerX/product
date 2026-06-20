@@ -1,34 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getOrdersCollection, initializeOrdersCollection } from '@/plugin/product/models/Order';
-import { EXPRESS_API, LICENSE_KEY } from '@/lib/express';
+import { resolveUser } from '@/lib/session';
 
-async function resolveUser(req: NextRequest): Promise<{ userId: string; userType: string } | null> {
-    try {
-        const res = await fetch(`${EXPRESS_API}/auth/me`, {
-            headers: {
-                'Content-Type': 'application/json',
-                'x-license-key': LICENSE_KEY,
-                'cookie': req.headers.get('cookie') ?? '',
-            },
-        });
-        if (!res.ok) return null;
-        const data = await res.json();
-        const user = data.user ?? data;
-        if (!user?._id) return null;
-        return { userId: String(user._id), userType: user.type ?? 'user' };
-    } catch {
-        return null;
-    }
-}
+export const dynamic = 'force-dynamic';
 
-/**
- * GET /api/orders/:orderNumber
- *
- * Returns a single order by its human-readable order number (e.g. ORD-ABC123-XY).
- * Authenticated users can only fetch their own orders.
- * Admins can fetch any order.
- * Unauthenticated callers can also fetch (guest order confirmation display).
- */
+/** GET /api/orders/:orderNumber */
 export async function GET(
     req: NextRequest,
     { params }: { params: Promise<{ orderNumber: string }> }
@@ -39,11 +15,8 @@ export async function GET(
             return NextResponse.json({ error: 'Order number required' }, { status: 400 });
         }
 
-        // Resolve caller (optional — guests can view their own confirmation)
-        let userId: string | null = null;
-        let userType = 'user';
         const caller = await resolveUser(req);
-        if (caller) { userId = caller.userId; userType = caller.userType; }
+        const isAdmin = caller?.userType === 'admin' || caller?.userType === 'superadmin';
 
         await initializeOrdersCollection();
         const collection = await getOrdersCollection();
@@ -53,9 +26,8 @@ export async function GET(
             return NextResponse.json({ error: 'Order not found' }, { status: 404 });
         }
 
-        // Non-admin, logged-in users may only view their own orders
-        const isAdmin = userType === 'admin' || userType === 'superadmin';
-        if (userId && !isAdmin && order.userId && order.userId !== userId) {
+        // Logged-in non-admin users may only view their own orders
+        if (caller && !isAdmin && order.userId && order.userId !== caller.userId) {
             return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
         }
 
@@ -66,14 +38,7 @@ export async function GET(
     }
 }
 
-/**
- * PUT /api/orders/:orderNumber
- *
- * Update an order's status, paymentStatus, or add a timeline note.
- * Admin only.
- *
- * Body: { status?, paymentStatus?, note?, inventoryUpdated? }
- */
+/** PUT /api/orders/:orderNumber — admin only */
 export async function PUT(
     req: NextRequest,
     { params }: { params: Promise<{ orderNumber: string }> }
@@ -81,17 +46,9 @@ export async function PUT(
     try {
         const { orderNumber } = await params;
 
-        // Admin guard
-        let userId   = 'unknown';
-        let userName = 'Admin';
-        let userType = 'user';
         const caller = await resolveUser(req);
-        if (caller) {
-            userId   = caller.userId;
-            userType = caller.userType;
-        }
+        const isAdmin = caller?.userType === 'admin' || caller?.userType === 'superadmin';
 
-        const isAdmin = userType === 'admin' || userType === 'superadmin';
         if (!isAdmin) {
             return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
         }
@@ -107,28 +64,22 @@ export async function PUT(
             return NextResponse.json({ error: 'Order not found' }, { status: 404 });
         }
 
-        // Build update payload
         const $set: Record<string, any> = { updatedAt: new Date() };
-        if (status)           $set.status           = status;
-        if (paymentStatus)    $set.paymentStatus    = paymentStatus;
+        if (status)                       $set.status           = status;
+        if (paymentStatus)                $set.paymentStatus    = paymentStatus;
         if (inventoryUpdated !== undefined) $set.inventoryUpdated = inventoryUpdated;
 
-        // Append timeline entry when a meaningful change or note is provided
-        const timelineStatus = status ?? order.status;
         const timelineEntry = {
-            status:        timelineStatus,
-            note:          note || `Status updated to ${timelineStatus}`,
-            createdBy:     userId,
-            createdByName: userName,
+            status:        status ?? order.status,
+            note:          note || `Status updated to ${status ?? order.status}`,
+            createdBy:     caller?.userId    ?? 'admin',
+            createdByName: 'Admin',
             createdAt:     new Date(),
         };
 
         await collection.updateOne(
             { orderNumber },
-            {
-                $set,
-                $push: { timeline: timelineEntry },
-            } as any
+            { $set, $push: { timeline: timelineEntry } } as any
         );
 
         const updated = await collection.findOne({ orderNumber });
