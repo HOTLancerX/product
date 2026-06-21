@@ -11,13 +11,15 @@ import ProductBox1 from "./box/Product-1";
 import ProductBox2 from "./box/Product-2";
 import Header4 from "./header/Header1";
 import CheckoutPage from "./checkout/page";
-import AdminOrdersPage from "./orders/page";
-import AdminOrderDetailPage from "./orders/details";
-import PendingOrdersPage    from "./orders/pending/page";
-import ProcessingOrdersPage from "./orders/processing/page";
-import ShippedOrdersPage    from "./orders/shipped/page";
-import DeliveredOrdersPage  from "./orders/delivered/page";
-import CancelledOrdersPage  from "./orders/cancelled/page";
+import AdminOrdersPage      from "./orders/page";
+import AdminOrderDetailPage  from "./orders/details";
+import PendingOrdersPage     from "./orders/pending/page";
+import ProcessingOrdersPage  from "./orders/processing/page";
+import ShippedOrdersPage     from "./orders/shipped/page";
+import DeliveredOrdersPage   from "./orders/delivered/page";
+import CancelledOrdersPage   from "./orders/cancelled/page";
+import UserOrderList         from "./users/orderlist";
+import UserOrderDetails      from "./users/orderdetails";
 // NOTE: lib/category.ts is NOT imported here — it imports Mongoose models
 // and would pollute the client bundle via the plugin registry chain.
 // Instead, we register a lazy wrapper below that only resolves the import
@@ -651,7 +653,6 @@ export function register() {
     ], PLUGINS.nx);
 
     // ─── Checkout static page (root.pages single) ──────────────────────────
-    // Registers /checkout as a static single page resolved by the slug router.
     addHook("root.pages", [
         {
             key: "checkout",
@@ -662,6 +663,40 @@ export function register() {
             position: 10,
             active: true,
             component: CheckoutPage,
+        },
+    ], PLUGINS.nx);
+
+    // ─── User account nav items ─────────────────────────────────────────────
+    addHook("user.nav", [
+        {
+            key:      "user-orders",
+            label:    "My Orders",
+            icon:     "solar:bag-bold",
+            slug:     "orders",
+            parent:   "",
+            position: 2,
+        },
+    ], PLUGINS.nx);
+
+    // ─── User account pages ─────────────────────────────────────────────────
+    // URL: /account/orders          → order list
+    // URL: /account/orders/<_id>    → order detail (prefix match)
+    addHook("user.page", [
+        {
+            key:      "orders",
+            label:    "My Orders",
+            type:     "user-orders",
+            style:    "left",
+            position: 10,
+            path:     UserOrderList,
+        },
+        {
+            key:      "orders/",
+            label:    "Order Detail",
+            type:     "user-orders",
+            style:    "left",
+            position: 11,
+            path:     UserOrderDetails,
         },
     ], PLUGINS.nx);
 }
