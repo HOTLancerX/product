@@ -24,8 +24,14 @@ interface ProductPageProps {
     };
     settings?: Record<string, any>;
     permalinkMap?: Record<string, string>;
-    /** Injected by serverDataHooks: { ancestors: [...] } */
-    pageData?: { ancestors?: { _id: string; title: string; slug: string }[] };
+    /** Injected by serverDataHooks: { ancestors: [...], seller: {...} | null } */
+    pageData?: {
+        ancestors?: { _id: string; title: string; slug: string }[];
+        seller?: {
+            _id: string; name: string; image: string; slug: string;
+            city: string; state: string; bio: string; website: string; twitter: string;
+        } | null;
+    };
 }
 
 function parseJson<T>(raw: string | undefined, fallback: T): T {
@@ -78,12 +84,17 @@ export default function ProductLayout1({ data, settings = {}, permalinkMap = {},
 
     // ── Category breadcrumb from pageData (injected server-side, no fetch) ──
     const ancestors  = pageData?.ancestors ?? [];
+    const seller     = pageData?.seller    ?? null;
     const catPrefix  = (permalinkMap['product-category'] ?? 'product/category')
         .trim().replace(/^\/+|\/+$/g, '');
     const categoryLinks = ancestors.map(cat => ({
         title: cat.title,
         url:   buildUrl(catPrefix, cat.slug),
     }));
+
+    // Build seller profile URL using the "seller" permalink prefix
+    const sellerPrefix = (permalinkMap['seller'] ?? 'seller')
+        .trim().replace(/^\/+|\/+$/g, '') || 'seller';
 
     return (
         <ProductClient
@@ -111,6 +122,10 @@ export default function ProductLayout1({ data, settings = {}, permalinkMap = {},
             htmlDescription={htmlDescription}
             orderNote={orderNote}
             categoryLinks={categoryLinks}
+            seller={seller ? {
+                ...seller,
+                profileUrl: buildUrl(sellerPrefix, seller.slug),
+            } : null}
         />
     );
 }

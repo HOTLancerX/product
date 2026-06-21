@@ -49,6 +49,12 @@ export interface ProductClientProps {
     orderNote: string;
     /** Category breadcrumb — root to leaf, each with title + url */
     categoryLinks?: { title: string; url: string }[];
+    /** Seller info — injected server-side from PostInfo userId → User */
+    seller?: {
+        _id: string; name: string; image: string; slug: string;
+        city: string; state: string; bio: string; website: string;
+        twitter: string; profileUrl: string;
+    } | null;
 }
 
 interface ShellProps {
@@ -182,6 +188,7 @@ export default function ProductClient({
     htmlDescription,
     orderNote,
     categoryLinks = [],
+    seller = null,
 }: ProductClientProps) {
     const { success, error } = useToast();
 
@@ -334,6 +341,13 @@ export default function ProductClient({
     return (
         <>
             {layout === 1 ? <Layout1Shell {...shellProps} /> : <Layout2Shell {...shellProps} />}
+
+            {/* ── Seller info card ── */}
+            {seller && (
+                <div className="container my-6">
+                    <SellerCard seller={seller} />
+                </div>
+            )}
 
             {htmlDescription && (
                 <div className="container my-6 description"
@@ -768,6 +782,92 @@ function Layout2Shell(props: ShellProps) {
                                 </div>
                             )}
                         </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// ── Seller Card ───────────────────────────────────────────────────────────────
+
+interface SellerCardProps {
+    seller: {
+        _id: string; name: string; image: string; slug: string;
+        city: string; state: string; bio: string; website: string;
+        twitter: string; profileUrl: string;
+    };
+}
+
+function SellerCard({ seller }: SellerCardProps) {
+    return (
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+            <p className="text-xs font-semibold uppercase tracking-wider text-gray-400 mb-4">
+                Sold by
+            </p>
+            <div className="flex items-start gap-4">
+                {/* Avatar */}
+                <Link href={seller.profileUrl} className="shrink-0">
+                    {seller.image ? (
+                        <img
+                            src={seller.image}
+                            alt={seller.name}
+                            className="w-14 h-14 rounded-xl object-cover ring-2 ring-orange-100"
+                        />
+                    ) : (
+                        <div className="w-14 h-14 rounded-xl bg-orange-100 flex items-center justify-center text-orange-600 font-bold text-2xl">
+                            {seller.name.charAt(0).toUpperCase()}
+                        </div>
+                    )}
+                </Link>
+
+                {/* Info */}
+                <div className="flex-1 min-w-0 space-y-1">
+                    <Link
+                        href={seller.profileUrl}
+                        className="text-base font-bold text-gray-900 hover:text-orange-600 transition-colors"
+                    >
+                        {seller.name}
+                    </Link>
+
+                    {(seller.city || seller.state) && (
+                        <p className="text-sm text-gray-500 flex items-center gap-1">
+                            📍 {[seller.city, seller.state].filter(Boolean).join(", ")}
+                        </p>
+                    )}
+
+                    {seller.bio && (
+                        <p className="text-sm text-gray-600 line-clamp-2">{seller.bio}</p>
+                    )}
+
+                    {/* Links */}
+                    <div className="flex flex-wrap gap-3 pt-1">
+                        <Link
+                            href={seller.profileUrl}
+                            className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full bg-orange-50 text-orange-600 hover:bg-orange-100 transition-colors"
+                        >
+                            🛒 View all products
+                        </Link>
+                        {seller.website && (
+                            <a
+                                href={seller.website}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1.5 text-xs font-medium text-gray-500 hover:text-gray-800 transition-colors"
+                            >
+                                🌐 Website
+                            </a>
+                        )}
+                        {seller.twitter && (
+                            <a
+                                href={`https://x.com/${seller.twitter.replace(/^@/, '')}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1.5 text-xs font-medium text-gray-500 hover:text-gray-800 transition-colors"
+                            >
+                                𝕏 {seller.twitter.startsWith('@') ? seller.twitter : `@${seller.twitter}`}
+                            </a>
+                        )}
                     </div>
                 </div>
             </div>
