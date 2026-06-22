@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import connectDB from '@/lib/mongodb';
 import { getOrdersCollection, initializeOrdersCollection, generateOrderNumber } from '@/plugin/product/models/Order';
-import Post from '@/models/post';
+import PostInfo from '@/models/post_info';
 import { resolveUser } from '@/lib/session';
 
 function parseUserAgent(userAgent: string) {
@@ -46,12 +46,16 @@ export async function POST(request: NextRequest) {
             || request.headers.get('x-real-ip') || 'Unknown';
         const { device, browser, os } = parseUserAgent(userAgent);
 
-        // Enrich items with product uploader's userId
+        // Enrich items with the seller's userId stored in PostInfo { name: "userId" }
         const enrichedItems = await Promise.all(
             items.map(async (item: any) => {
                 try {
-                    const product = await Post.findById(item.productId).select('userId').lean();
-                    return { ...item, uploadedBy: (product as any)?.userId || undefined };
+                    const infoDoc = await PostInfo.findOne({
+                        postId: item.productId,
+                        name:   'userId',
+                    }).lean();
+                    const uploadedBy = (infoDoc as any)?.value || undefined;
+                    return { ...item, uploadedBy };
                 } catch { return item; }
             })
         );

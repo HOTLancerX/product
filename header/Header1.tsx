@@ -3,6 +3,7 @@ import MenuClients from '@/components/MenuClients';
 import MobileDrawer from '@/components/page/header/MobileDrawer';
 import CartButton from './CartButton';
 import type { MenuItem } from '@/models/Menu';
+import AuthAc from '@/components/AuthAc';
 
 interface Header4Props {
     settings?: Record<string, any>;
@@ -60,6 +61,7 @@ export default function Header4({
                     {rightItems.length > 0 && (
                         <MenuClients menuItems={rightItems} settings={settings} builderContent={builderContent} className="flex items-center" />
                     )}
+                    <AuthAc />
                     <CartButton fontSize={22} color="#374151" />
                 </div>
             </div>

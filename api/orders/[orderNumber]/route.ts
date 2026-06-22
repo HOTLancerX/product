@@ -38,7 +38,7 @@ export async function GET(
     }
 }
 
-/** PUT /api/orders/:orderNumber — admin only */
+/** PUT /api/orders/:orderNumber — admin or seller (limited status update) */
 export async function PUT(
     req: NextRequest,
     { params }: { params: Promise<{ orderNumber: string }> }
@@ -47,14 +47,12 @@ export async function PUT(
         const { orderNumber } = await params;
 
         const caller = await resolveUser(req);
-        const isAdmin = caller?.userType === 'admin' || caller?.userType === 'superadmin';
-
-        if (!isAdmin) {
-            return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+        if (!caller) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
         }
 
-        const body = await req.json();
-        const { status, paymentStatus, note, inventoryUpdated } = body;
+        const isAdmin  = caller.userType === 'admin' || caller.userType === 'superadmin';
+        const isSeller = caller.userType === 'seller';
 
         await initializeOrdersCollection();
         const collection = await getOrdersCollection();
@@ -64,16 +62,65 @@ export async function PUT(
             return NextResponse.json({ error: 'Order not found' }, { status: 404 });
         }
 
+        // Verify seller owns at least one item in this order
+        if (!isAdmin) {
+            if (!isSeller) {
+                return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+            }
+
+            // Fast path: uploadedBy already stamped
+            let isSellerInOrder = order.items.some(
+                (item: any) => item.uploadedBy === caller.userId
+            );
+
+            // Slow path: old orders without uploadedBy — check PostInfo
+            if (!isSellerInOrder) {
+                const { getCollection } = await import('@/lib/mongodb');
+                const postInfoCol = await getCollection('postinfos');
+                const productIds  = order.items.map((item: any) => item.productId).filter(Boolean);
+                const match = await postInfoCol.findOne({
+                    postId: { $in: productIds },
+                    name:   'userId',
+                    value:  caller.userId,
+                });
+                isSellerInOrder = Boolean(match);
+            }
+
+            if (!isSellerInOrder) {
+                return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+            }
+        }
+
+        const body = await req.json();
+        const { status, paymentStatus, note, inventoryUpdated } = body;
+
+        // Sellers may only update to processing, shipped, delivered, or cancelled
+        const SELLER_ALLOWED_STATUSES = ['processing', 'shipped', 'delivered', 'cancelled'];
+        if (!isAdmin && status && !SELLER_ALLOWED_STATUSES.includes(status)) {
+            return NextResponse.json(
+                { error: `Sellers may only set status to: ${SELLER_ALLOWED_STATUSES.join(', ')}` },
+                { status: 403 }
+            );
+        }
+
+        // Sellers cannot change payment status
+        if (!isAdmin && paymentStatus) {
+            return NextResponse.json(
+                { error: 'Sellers cannot update payment status' },
+                { status: 403 }
+            );
+        }
+
         const $set: Record<string, any> = { updatedAt: new Date() };
-        if (status)                       $set.status           = status;
-        if (paymentStatus)                $set.paymentStatus    = paymentStatus;
-        if (inventoryUpdated !== undefined) $set.inventoryUpdated = inventoryUpdated;
+        if (status)                         $set.status           = status;
+        if (isAdmin && paymentStatus)        $set.paymentStatus    = paymentStatus;
+        if (inventoryUpdated !== undefined)  $set.inventoryUpdated = inventoryUpdated;
 
         const timelineEntry = {
             status:        status ?? order.status,
             note:          note || `Status updated to ${status ?? order.status}`,
-            createdBy:     caller?.userId    ?? 'admin',
-            createdByName: 'Admin',
+            createdBy:     caller.userId,
+            createdByName: isAdmin ? 'Admin' : 'Seller',
             createdAt:     new Date(),
         };
 

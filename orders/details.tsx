@@ -216,6 +216,40 @@ export default function AdminOrderDetailPage() {
         }
     };
 
+    const handleQuickAction = async (targetStatus: "delivered" | "cancelled") => {
+        if (!order) return;
+        const label = targetStatus === "delivered" ? "delivered" : "cancelled";
+        if (!confirm(`Mark this order as ${label}?`)) return;
+        setSaving(true);
+        setSaveMsg("");
+        try {
+            const res = await fetch(`/api/orders/${order.orderNumber}`, {
+                method:      "PUT",
+                credentials: "include",
+                headers:     { "Content-Type": "application/json" },
+                body:        JSON.stringify({
+                    status: targetStatus,
+                    note:   targetStatus === "delivered"
+                        ? "Order marked as delivered."
+                        : "Order cancelled.",
+                }),
+            });
+            const data = await res.json();
+            if (!res.ok) { setSaveMsg(`Error: ${data.error ?? "Failed to save"}`); return; }
+
+            const updated: Order = data.order;
+            setOrder(updated);
+            setNewStatus(updated.status);
+            setNewPayment(updated.paymentStatus);
+            setSaveMsg(`Order marked as ${label}.`);
+            setTimeout(() => setSaveMsg(""), 3000);
+        } catch {
+            setSaveMsg("Network error — could not save.");
+        } finally {
+            setSaving(false);
+        }
+    };
+
     // ── Loading / error states ────────────────────────────────────────────────
 
     if (loading) {
@@ -435,6 +469,28 @@ export default function AdminOrderDetailPage() {
                                     : <><Icon icon="solar:check-circle-bold" width={16} /> Save Changes</>
                                 }
                             </button>
+
+                            {/* Quick action buttons */}
+                            <div className="grid grid-cols-2 gap-2 pt-1 border-t border-gray-100">
+                                <button
+                                    type="button"
+                                    onClick={() => handleQuickAction("delivered")}
+                                    disabled={saving || order.status === "delivered" || order.status === "cancelled"}
+                                    className="inline-flex items-center justify-center gap-1.5 px-3 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-semibold rounded-xl transition disabled:opacity-40 disabled:cursor-not-allowed"
+                                >
+                                    <Icon icon="mdi:check-circle-outline" width={15} />
+                                    Delivered
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => handleQuickAction("cancelled")}
+                                    disabled={saving || order.status === "delivered" || order.status === "cancelled"}
+                                    className="inline-flex items-center justify-center gap-1.5 px-3 py-2.5 bg-red-500 hover:bg-red-600 text-white text-xs font-semibold rounded-xl transition disabled:opacity-40 disabled:cursor-not-allowed"
+                                >
+                                    <Icon icon="mdi:close-circle-outline" width={15} />
+                                    Cancel
+                                </button>
+                            </div>
                         </div>
                     </Card>
 
