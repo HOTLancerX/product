@@ -71,7 +71,7 @@ export default function ProductCategoryLayout1({
             >
                 {catImage && <div className="absolute inset-0 bg-black/50" />}
 
-                <div className="relative max-w-6xl mx-auto">
+                <div className="relative container">
                     {/* Breadcrumb: Home > Parent > ... > Current */}
                     <nav className="flex items-center gap-1.5 text-sm text-white/70 mb-4 flex-wrap"
                         aria-label="breadcrumb">
@@ -108,8 +108,7 @@ export default function ProductCategoryLayout1({
                 </div>
             </header>
 
-            <div className="max-w-6xl mx-auto px-4 md:px-6 py-8 space-y-8">
-
+            <div className="container py-8 space-y-8">
                 {/* Sub-category chips */}
                 {subCats.length > 0 && (
                     <nav className="flex flex-wrap gap-2" aria-label="Sub-categories">

@@ -65,7 +65,7 @@ export default function ProductCategoryLayout2({
                 <div className="absolute inset-0 bg-linear-to-r from-[#0a0c10]/90 via-[#0a0c10]/60 to-transparent" />
                 <div className="absolute top-0 right-0 w-96 h-96 rounded-full bg-emerald-500/10 blur-3xl pointer-events-none" />
 
-                <div className="relative max-w-6xl mx-auto">
+                <div className="relative container">
                     <nav className="flex items-center gap-1.5 text-sm text-white/50 mb-4 flex-wrap"
                         aria-label="breadcrumb">
                         <Link href="/" className="hover:text-white transition-colors">Home</Link>
@@ -103,7 +103,7 @@ export default function ProductCategoryLayout2({
                 </div>
             </header>
 
-            <div className="max-w-6xl mx-auto px-4 md:px-6 py-8 space-y-8">
+            <div className="container py-8 space-y-8">
 
                 {/* Sub-category chips */}
                 {subCats.length > 0 && (

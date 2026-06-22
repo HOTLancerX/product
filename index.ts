@@ -11,6 +11,7 @@ import ProductBox1 from "./box/Product-1";
 import ProductBox2 from "./box/Product-2";
 import Header4 from "./header/Header1";
 import CheckoutPage from "./checkout/page";
+import OrderConfirmationPage from "./order-confirmation/page";
 import AdminOrdersPage      from "./orders/page";
 import AdminOrderDetailPage  from "./orders/details";
 import PendingOrdersPage     from "./orders/pending/page";
@@ -663,6 +664,16 @@ export function register() {
             position: 10,
             active: true,
             component: CheckoutPage,
+        },
+        {
+            key: "order-confirmation",
+            label: "Order Confirmation",
+            type: "single",
+            slug: "prefix",
+            style: "left",
+            position: 11,
+            active: true,
+            component: OrderConfirmationPage,
         },
     ], PLUGINS.nx);
 
