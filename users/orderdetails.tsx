@@ -117,19 +117,29 @@ export default function UserOrderDetails() {
 
     if (loading) {
         return (
-            <div className="flex items-center justify-center py-32 text-gray-300">
-                <Icon icon="svg-spinners:ring-resize" width={36} />
+            <div className="space-y-5">
+                <div className="flex items-center gap-3">
+                    <div className="h-4 w-20 bg-gray-100 rounded-lg animate-pulse" />
+                    <div className="h-4 w-32 bg-gray-100 rounded-lg animate-pulse" />
+                </div>
+                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-4 animate-pulse">
+                    {[...Array(5)].map((_, i) => (
+                        <div key={i} className="h-10 bg-gray-50 rounded-xl" style={{ animationDelay: `${i * 60}ms` }} />
+                    ))}
+                </div>
             </div>
         );
     }
 
     if (error || !order) {
         return (
-            <div className="text-center py-32">
-                <Icon icon="solar:receipt-remove-outline" width={52} className="mx-auto mb-4 text-gray-200" />
-                <p className="text-base font-semibold text-gray-500">{error || "Order not found."}</p>
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm py-16 text-center">
+                <div className="w-16 h-16 rounded-2xl bg-red-50 flex items-center justify-center mx-auto mb-4">
+                    <Icon icon="solar:receipt-remove-bold" width={32} className="text-red-300" />
+                </div>
+                <p className="text-base font-bold text-gray-500">{error || "Order not found."}</p>
                 <Link href="/account/orders"
-                    className="mt-4 inline-flex items-center gap-1.5 text-main hover:underline text-sm">
+                    className="mt-4 inline-flex items-center gap-1.5 text-sm font-semibold text-indigo-600 hover:text-indigo-700 transition">
                     <Icon icon="solar:arrow-left-bold" width={14} />
                     Back to Orders
                 </Link>
@@ -137,64 +147,63 @@ export default function UserOrderDetails() {
         );
     }
 
-    const orderStatus  = STATUS_BADGE[order.status]        ?? STATUS_BADGE.pending;
-    const paymentStatus = STATUS_BADGE[order.paymentStatus] ?? STATUS_BADGE.pending;
+    const orderStatus   = STATUS_BADGE[order.status]         ?? STATUS_BADGE.pending;
+    const paymentStatus = STATUS_BADGE[order.paymentStatus]  ?? STATUS_BADGE.pending;
 
     return (
         <div className="space-y-5">
 
-            {/* Header */}
+            {/* ── Header ── */}
             <div className="flex items-center justify-between gap-3 flex-wrap">
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2 min-w-0">
                     <Link href="/account/orders"
-                        className="inline-flex items-center gap-1.5 text-sm text-gray-400 hover:text-gray-700 transition">
+                        className="flex items-center gap-1.5 text-sm text-gray-400 hover:text-gray-700 transition shrink-0">
                         <Icon icon="solar:arrow-left-bold" width={14} />
-                        Orders
+                        <span className="hidden sm:inline">My Orders</span>
                     </Link>
-                    <span className="text-gray-300">/</span>
-                    <h1 className="text-base font-bold text-gray-900 font-mono">{order.orderNumber}</h1>
+                    <Icon icon="solar:alt-arrow-right-bold" width={12} className="text-gray-300 shrink-0" />
+                    <h1 className="text-sm font-bold text-gray-900 font-mono truncate">{order.orderNumber}</h1>
                 </div>
-                <div className="flex items-center gap-2 flex-wrap">
-                    <span className={`inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full ${orderStatus.cls}`}>
-                        <Icon icon={orderStatus.icon} width={12} />
+                <div className="flex items-center gap-2 flex-wrap shrink-0">
+                    <span className={`inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full ${orderStatus.cls}`}>
+                        <Icon icon={orderStatus.icon} width={11} />
                         {orderStatus.label}
                     </span>
-                    <span className={`inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full ${paymentStatus.cls}`}>
+                    <span className={`inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-full ${paymentStatus.cls}`}>
                         {paymentStatus.label}
+                    </span>
+                    <span className="text-xs text-gray-400">
+                        {new Date(order.createdAt).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })}
                     </span>
                 </div>
             </div>
 
-            {/* Order progress tracker */}
+            {/* ── Progress tracker ── */}
             {order.status !== "cancelled" && (
                 <div className="bg-white rounded-2xl border border-gray-100 shadow-sm px-5 py-5">
                     {(() => {
                         const steps = ["pending", "processing", "shipped", "delivered"];
                         const current = steps.indexOf(order.status);
                         return (
-                            <div className="flex items-center gap-0">
+                            <div className="flex items-center">
                                 {steps.map((step, i) => {
                                     const done   = i <= current;
                                     const active = i === current;
-                                    const s = STATUS_BADGE[step] ?? STATUS_BADGE.pending;
+                                    const s      = STATUS_BADGE[step] ?? STATUS_BADGE.pending;
                                     return (
                                         <div key={step} className="flex items-center flex-1 last:flex-none">
-                                            <div className="flex flex-col items-center gap-1.5">
+                                            <div className="flex flex-col items-center gap-1.5 shrink-0">
                                                 <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${
-                                                    done ? "bg-main text-white" : "bg-gray-100 text-gray-300"
-                                                } ${active ? "ring-4 ring-main/20" : ""}`}>
-                                                    <Icon icon={s.icon} width={16} />
+                                                    done ? "bg-indigo-500 text-white" : "bg-gray-100 text-gray-300"
+                                                } ${active ? "ring-4 ring-indigo-500/20 scale-110" : ""}`}>
+                                                    <Icon icon={s.icon} width={15} />
                                                 </div>
-                                                <span className={`text-[10px] font-semibold capitalize whitespace-nowrap ${
-                                                    done ? "text-main" : "text-gray-300"
-                                                }`}>
+                                                <span className={`text-[9px] font-bold capitalize whitespace-nowrap ${done ? "text-indigo-500" : "text-gray-300"}`}>
                                                     {step}
                                                 </span>
                                             </div>
                                             {i < steps.length - 1 && (
-                                                <div className={`flex-1 h-0.5 mb-5 mx-1 ${
-                                                    i < current ? "bg-main" : "bg-gray-100"
-                                                }`} />
+                                                <div className={`flex-1 h-0.5 mx-1.5 mb-4 rounded-full transition-all ${i < current ? "bg-indigo-500" : "bg-gray-100"}`} />
                                             )}
                                         </div>
                                     );
