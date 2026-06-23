@@ -284,7 +284,7 @@ export default function UserOrderDetails() {
 
             {/* ── Items ── */}
             <Section title={`Order Items (${order.items.length})`} icon="solar:box-bold" iconBg="bg-indigo-50" iconColor="text-indigo-600">
-                <div className="space-y-4">
+                <div className="space-y-4 pt-4">
                     {order.items.map((item, i) => (
                         <div key={i} className={`flex gap-4 ${i > 0 ? "pt-4 border-t border-gray-50" : ""}`}>
                             {/* Image */}

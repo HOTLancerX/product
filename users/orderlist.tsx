@@ -214,7 +214,7 @@ export default function UserOrderList() {
                         <div className={`h-1.5 ${s.barColor}`} />
 
                         {/* ── Card header ── */}
-                        <div className="flex items-center justify-between gap-2 px-5 pt-4 pb-3 flex-wrap">
+                        <div className="flex items-center justify-between gap-2 px-5 mt-4 pb-3 flex-wrap">
                             {/* Order number + date */}
                             <div className="flex items-center gap-3 min-w-0">
                                 <div className={`flex items-center justify-center w-9 h-9 rounded-xl shrink-0 ${s.iconBg}`}>
