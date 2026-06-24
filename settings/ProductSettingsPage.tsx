@@ -7,6 +7,7 @@ import { useActivePlugins } from "@/hook/useActivePlugins";
 import useSettings from "@/lib/useSettings";
 import PaymentGatewaySettings from "./PaymentGatewaySettings";
 import CheckoutFieldSettings from "./CheckoutFieldSettings";
+import CategoryPageSettings from "./CategoryPageSettings";
 
 /**
  * Product plugin settings page.
@@ -38,6 +39,12 @@ const TABS: Tab[] = [
         label:       "Shipping",
         icon:        "solar:delivery-bold",
         description: "Default shipping rates, free shipping threshold and shipping zones.",
+    },
+    {
+        key:         "category",
+        label:       "Category Page",
+        icon:        "solar:filter-bold",
+        description: "Configure the filter panel, filter style and sort options shown on product category pages.",
     },
     {
         key:         "checkout",
@@ -120,6 +127,10 @@ export default function ProductSettingsPage() {
                     activePlugins={activePlugins}
                     initialValues={settings}
                 />
+            )}
+
+            {activeTab === "category" && (
+                <CategoryPageSettings initialValues={settings} />
             )}
 
             {activeTab === "checkout" && (

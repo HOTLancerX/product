@@ -22,6 +22,7 @@ import type {
     CategorySubCat,
     CategoryAncestor,
     CategoryPageData,
+    AttributeOption,
 } from "./types";
 
 export type {
@@ -29,6 +30,7 @@ export type {
     CategorySubCat,
     CategoryAncestor,
     CategoryPageData,
+    AttributeOption,
 };
 
 /**
@@ -47,21 +49,22 @@ export async function getCategoryAncestors(
 /**
  * Fetch all data needed for a product category page.
  *
- * @param catId  — MongoDB ObjectId string of the category being viewed
+ * @param catId   — MongoDB ObjectId string of the category being viewed
  * @param catSlug — slug of the category being viewed (for ancestor lookup)
  */
 export async function getCategoryPageData(
     catId: string,
     catSlug: string
 ): Promise<CategoryPageData> {
-    const [products, subCats, ancestors, activeBox] = await Promise.all([
+    const [products, subCats, ancestors, activeBox, attributeOptions] = await Promise.all([
         getProductsInCategory(catId),
         getSubCategories(catId),
         buildAncestorChain(catId),
         getActiveBoxTemplate(),
+        getAttributeOptions(catId),
     ]);
 
-    return { products, subCats, ancestors, activeBox };
+    return { products, subCats, ancestors, activeBox, attributeOptions };
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -138,6 +141,124 @@ async function getActiveBoxTemplate(): Promise<{ label: string; pluginNx: string
 
     if (!doc) return null;
     return { label: doc.label as string, pluginNx: doc.pluginNx as string };
+}
+
+/**
+ * Build attribute filter options for the given category.
+ *
+ * Product attribute values are stored as a single JSON blob in PostInfo
+ * with name="_variate". The blob contains:
+ *
+ *   Single products:  { singleAttributes: [{ dbId, label, values: string[] }] }
+ *   Variant products: { selectedAttributes: [{ dbId, label, values: string[] }],
+ *                       variants: [{ options: { [label]: value } }] }
+ *
+ * We read all _variate blobs for products in this category tree, extract
+ * every distinct (label → value) pair, then group them into AttributeOption[]
+ * sorted by label.
+ *
+ * The `id` on each AttributeOption is the attribute label lowercased + slugified
+ * so it stays stable as a URL param key (attr_<id>).
+ *
+ * Returns an empty array when no attribute values are found — the UI will
+ * then hide the filter panel entirely.
+ */
+async function getAttributeOptions(catId: string): Promise<AttributeOption[]> {
+    try {
+        // 1. Get all products in this category tree
+        const allCatIds = await getDescendantIds(catId);
+        const posts = await Post.find({
+            category: { $in: allCatIds },
+            type:     "product",
+            status:   "published",
+        }).select("_id").lean() as any[];
+
+        if (posts.length === 0) return [];
+
+        const postIds = posts.map((p: any) => p._id);
+
+        // 2. Fetch the _variate blob for every product in one query
+        const variateDocs = await PostInfo.find({
+            postId: { $in: postIds },
+            name:   "_variate",
+        }).lean() as any[];
+
+        if (variateDocs.length === 0) return [];
+
+        // 3. Accumulate distinct values per attribute label
+        const labelMap: Map<string, Set<string>> = new Map();
+
+        for (const doc of variateDocs) {
+            let blob: Record<string, any>;
+            try { blob = JSON.parse(doc.value ?? "{}"); } catch { continue; }
+
+            const priceType: string = blob.priceType ?? "single";
+
+            if (priceType === "single") {
+                // singleAttributes: [{ dbId, label, values: string[] }]
+                const attrs: { dbId?: string; label: string; values: string[] }[] =
+                    blob.singleAttributes ?? [];
+
+                for (const attr of attrs) {
+                    if (!attr.label || !Array.isArray(attr.values)) continue;
+                    const key = attr.label.trim();
+                    if (!key) continue;
+                    if (!labelMap.has(key)) labelMap.set(key, new Set());
+                    for (const v of attr.values) {
+                        const clean = String(v ?? "").trim();
+                        if (clean) labelMap.get(key)!.add(clean);
+                    }
+                }
+            } else {
+                // Variant: collect from selectedAttributes.values + variant options
+                const selectedAttributes: { dbId?: string; label: string; values: string[] }[] =
+                    blob.selectedAttributes ?? [];
+
+                for (const attr of selectedAttributes) {
+                    if (!attr.label || !Array.isArray(attr.values)) continue;
+                    const key = attr.label.trim();
+                    if (!key) continue;
+                    if (!labelMap.has(key)) labelMap.set(key, new Set());
+                    for (const v of attr.values) {
+                        const clean = String(v ?? "").trim();
+                        if (clean) labelMap.get(key)!.add(clean);
+                    }
+                }
+
+                // Also pull values actually used in generated variants
+                const variants: { options?: Record<string, string> }[] = blob.variants ?? [];
+                for (const variant of variants) {
+                    if (!variant.options) continue;
+                    for (const [label, val] of Object.entries(variant.options)) {
+                        const key = label.trim();
+                        const clean = String(val ?? "").trim();
+                        if (!key || !clean) continue;
+                        if (!labelMap.has(key)) labelMap.set(key, new Set());
+                        labelMap.get(key)!.add(clean);
+                    }
+                }
+            }
+        }
+
+        if (labelMap.size === 0) return [];
+
+        // 4. Build AttributeOption[] — id is a stable URL-safe slug from the label
+        const results: AttributeOption[] = [];
+        for (const [label, valueSet] of labelMap) {
+            const values = [...valueSet].sort();
+            if (values.length === 0) continue;
+            const id = label.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+            results.push({ id, label, values });
+        }
+
+        // Sort groups alphabetically by label
+        results.sort((a, b) => a.label.localeCompare(b.label));
+
+        return results;
+    } catch {
+        // Non-critical — category page still works without filters
+        return [];
+    }
 }
 
 /** Recursively collect catId + all descendant category ObjectIds */
