@@ -19,6 +19,7 @@ import ProcessingOrdersPage  from "./orders/processing/page";
 import ShippedOrdersPage     from "./orders/shipped/page";
 import DeliveredOrdersPage   from "./orders/delivered/page";
 import CancelledOrdersPage   from "./orders/cancelled/page";
+import ReturnManager         from "./orders/ReturnManager";
 import UserOrderList         from "./users/orderlist";
 import UserOrderDetails      from "./users/orderdetails";
 // NOTE: lib/category.ts is NOT imported here — it imports Mongoose models
@@ -436,6 +437,14 @@ export function register() {
             position: 6,
         },
         {
+            key: "orders-returns",
+            label: "Returns",
+            icon: "solar:box-minimalistic-bold",
+            slug: "orders/returns",
+            parent: "orders",
+            position: 7,
+        },
+        {
             key: "product-settings",
             label: "Product Settings",
             icon: "solar:settings-bold",
@@ -504,6 +513,14 @@ export function register() {
             style: "left",
             position: 16,
             path: CancelledOrdersPage,
+        },
+        {
+            key: "orders/returns",
+            label: "Return Requests",
+            type: "product-orders",
+            style: "left",
+            position: 17,
+            path: ReturnManager,
         },
         {
             key: "product/settings",
