@@ -118,11 +118,11 @@ export default function CheckoutPage() {
 
     const fetchUserData = async () => {
         try {
-            const res = await fetch('/api/auth/me');
+            const res = await fetch('/api/auth/session');
             if (res.ok) {
                 const data = await res.json();
-                // Check if user exists before accessing properties
-                if (data.user) {
+                // NextAuth /api/auth/session returns { user: {...} } when logged in, or {} when not
+                if (data?.user) {
                     setUser(data.user);
                     // Pre-fill form with user data including address information
                     setFormData(prev => ({

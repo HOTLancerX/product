@@ -14,22 +14,22 @@ export interface CheckoutField {
 }
 
 const DEFAULT_FIELDS: CheckoutField[] = [
-    { key: "name",           name: "Full Name",           desktop: "w-1/2", mobile: "wp-full", required: true,  status: true },
-    { key: "phone",          name: "Phone Number",         desktop: "w-1/2", mobile: "wp-full", required: true,  status: true },
-    { key: "email",          name: "Email",                desktop: "w-full", mobile: "wp-full", required: false, status: true },
-    { key: "address",        name: "Address",              desktop: "w-full", mobile: "wp-full", required: false, status: true },
-    { key: "state",          name: "State / Province",     desktop: "w-1/2", mobile: "wp-full", required: false, status: true },
-    { key: "city",           name: "City",                 desktop: "w-1/2", mobile: "wp-full", required: false, status: true },
-    { key: "zipCode",        name: "Zip Code",             desktop: "w-1/2", mobile: "wp-full", required: false, status: true },
-    { key: "shippingMethod", name: "Shipping Method",      desktop: "w-full", mobile: "wp-full", required: true,  status: true },
-    { key: "paymentMethod",  name: "Payment Method",       desktop: "w-full", mobile: "wp-full", required: true,  status: true },
-    { key: "transactionId",  name: "Transaction ID",       desktop: "w-1/2", mobile: "wp-full", required: false, status: true },
-    { key: "paymentInfo",    name: "Payment Details",      desktop: "w-1/2", mobile: "wp-full", required: false, status: true },
-    { key: "proofImage",     name: "Payment Screenshot",   desktop: "w-full", mobile: "wp-full", required: false, status: true },
-    { key: "notes",          name: "Order Notes",          desktop: "w-full", mobile: "wp-full", required: false, status: true },
+    { key: "name",           name: "Full Name",           desktop: "w-1/2", mobile: "w-full", required: true,  status: true },
+    { key: "phone",          name: "Phone Number",         desktop: "w-1/2", mobile: "w-full", required: true,  status: true },
+    { key: "email",          name: "Email",                desktop: "w-full", mobile: "w-full", required: false, status: true },
+    { key: "address",        name: "Address",              desktop: "w-full", mobile: "w-full", required: false, status: true },
+    { key: "state",          name: "State / Province",     desktop: "w-1/2", mobile: "w-full", required: false, status: true },
+    { key: "city",           name: "City",                 desktop: "w-1/2", mobile: "w-full", required: false, status: true },
+    { key: "zipCode",        name: "Zip Code",             desktop: "w-1/2", mobile: "w-full", required: false, status: true },
+    { key: "shippingMethod", name: "Shipping Method",      desktop: "w-full", mobile: "w-full", required: true,  status: true },
+    { key: "paymentMethod",  name: "Payment Method",       desktop: "w-full", mobile: "w-full", required: true,  status: true },
+    { key: "transactionId",  name: "Transaction ID",       desktop: "w-1/2", mobile: "w-full", required: false, status: true },
+    { key: "paymentInfo",    name: "Payment Details",      desktop: "w-1/2", mobile: "w-full", required: false, status: true },
+    { key: "proofImage",     name: "Payment Screenshot",   desktop: "w-full", mobile: "w-full", required: false, status: true },
+    { key: "notes",          name: "Order Notes",          desktop: "w-full", mobile: "w-full", required: false, status: true },
 ];
 
-const WIDTH_OPTIONS = ["wp-full", "wp-1/2", "wp-1/3", "wp-2/3"];
+const WIDTH_OPTIONS = ["w-full", "w-1/2", "w-1/3", "w-2/3"];
 
 interface Props {
     initialValues?: Record<string, any>;
