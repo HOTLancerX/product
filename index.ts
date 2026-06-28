@@ -407,7 +407,7 @@ export function register() {
         {
             key: "orders",
             label: "Orders",
-            icon: "solar:receipt-bold",
+            icon: "carbon:order-storm",
             slug: "orders",
             parent: "",
             position: 14,

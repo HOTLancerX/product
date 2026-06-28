@@ -353,7 +353,7 @@ export default function CheckoutPage() {
             // Online payment redirect flow (e.g. Stripe)
             const selectedGw = paymentGateways.find(g => g.type === formData.paymentMethod);
             if (selectedGw?.isOnline) {
-                const apiMap: Record<string, string> = { stripe: '/api/stripe/checkout' };
+                const apiMap: Record<string, string> = { stripe: '/api/stripe/checkout', paypal: '/api/paypal/checkout' };
                 const apiEndpoint = apiMap[formData.paymentMethod];
                 if (apiEndpoint) {
                     const onlineRes = await fetch(apiEndpoint, {

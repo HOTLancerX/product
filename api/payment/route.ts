@@ -97,6 +97,25 @@ export async function GET(_req: NextRequest) {
             });
         }
 
+        // 4. PayPal — auto-include if configured
+        const paypalClientId = await getSetting('paypal_client_id');
+        const paypalSecret = await getSetting('paypal_secret');
+        if (paypalClientId && paypalSecret) {
+            const paypalEnabled = await getSetting('paypal_enabled');
+            const isPayPalEnabled = paypalEnabled === null || paypalEnabled === undefined || paypalEnabled === 'true' || paypalEnabled === true;
+            gateways.push({
+                type:          'paypal',
+                label:         'PayPal',
+                title:         'PayPal',
+                icon:          'mdi:paypal',
+                instructions:  'You will be redirected to PayPal to complete your payment.',
+                enabled:       isPayPalEnabled,
+                source:        'paypal',
+                isOnline:      true,
+                requiresProof: false,
+            });
+        }
+
         // Default fallback — cash on delivery
         if (gateways.length === 0) {
             gateways = [
