@@ -47,6 +47,8 @@ export interface ProductClientProps {
     description: string;
     htmlDescription: string;
     orderNote: string;
+    shippingInside?: number;
+    shippingOutside?: number;
     /** Category breadcrumb — root to leaf, each with title + url */
     categoryLinks?: { title: string; url: string }[];
     /** Seller info — injected server-side from PostInfo userId → User */
@@ -187,6 +189,8 @@ export default function ProductClient({
     description,
     htmlDescription,
     orderNote,
+    shippingInside,
+    shippingOutside,
     categoryLinks = [],
     seller = null,
 }: ProductClientProps) {
@@ -271,6 +275,8 @@ export default function ProductClient({
         price:          currentPrice,
         quantity,
         maxQuantity:    currentStock || 9999,
+        shippingInside: shippingInside ?? undefined,
+        shippingOutside: shippingOutside ?? undefined,
     });
 
     const handleAddToCart = () => {

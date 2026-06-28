@@ -16,6 +16,7 @@ import CategoryPageSettings from "./CategoryPageSettings";
  * Tabs:
  *   General   — currency, social order buttons, stock messaging
  *   Shipping  — shipping costs, free shipping threshold
+ *   Category  — category page filter and sort options
  *   Checkout  — configurable checkout form fields (order/visibility/required)
  *   Payment   — payment gateway management (JSON editor + builder UI)
  */

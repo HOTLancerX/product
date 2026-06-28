@@ -116,6 +116,8 @@ export default function ProductBox1({ data, productUrl, currencySymbol = '$' }: 
             sku:            firstVariant?.sku,
             price:          currentPrice || parseFloat(firstVariant?.price || '0') || 0,
             maxQuantity:    stock || parseInt(firstVariant?.quantity || '0', 10) || 9999,
+            shippingInside: parseFloat(data.info?.shipping_inside ?? '') || undefined,
+            shippingOutside: parseFloat(data.info?.shipping_outside ?? '') || undefined,
         });
     };
 

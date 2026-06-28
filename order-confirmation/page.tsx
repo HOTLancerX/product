@@ -71,7 +71,7 @@ export default function OrderConfirmationPage() {
     // Last path segment is the orderNumber: /order-confirmation/ORD-xxx → "ORD-xxx"
     const orderNumber = pathname?.split("/").filter(Boolean).pop() ?? "";
     const { settings } = useSettings();
-    const currencySymbol = settings?.currency_symbol || settings?.product_currency_symbol || '';
+    const currencySymbol = settings?.product_currency_symbol || settings?.currency_symbol || '';
 
     const [order, setOrder] = useState<Order | null>(null);
     const [loading, setLoading] = useState(true);

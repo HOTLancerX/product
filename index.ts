@@ -207,6 +207,22 @@ export function register() {
             position: 75,
             component: Text,
         },
+        {
+            key: "shipping_inside",
+            label: "Inside Shipping Cost (per item)",
+            type: "product",
+            style: "right",
+            position: 80,
+            component: Text,
+        },
+        {
+            key: "shipping_outside",
+            label: "Outside Shipping Cost (per item)",
+            type: "product",
+            style: "right",
+            position: 85,
+            component: Text,
+        },
     ], PLUGINS.nx);
 
     // ─── Product Category cat form fields ───────────────────────────────────

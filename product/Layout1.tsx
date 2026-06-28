@@ -75,6 +75,8 @@ export default function ProductLayout1({ data, settings = {}, permalinkMap = {},
     const description      = data.info?.description      ?? '';
     const htmlDescription  = data.info?.htmlDescription  ?? '';
     const orderNote        = data.info?.orderNote        ?? '';
+    const shippingInside   = parseFloat(data.info?.shipping_inside ?? '') || undefined;
+    const shippingOutside  = parseFloat(data.info?.shipping_outside ?? '') || undefined;
 
     const hasDiscount     = priceType === 'single' && sellingPrice > 0 && regularPrice > sellingPrice;
     const discountPercent = hasDiscount
@@ -121,6 +123,8 @@ export default function ProductLayout1({ data, settings = {}, permalinkMap = {},
             description={description}
             htmlDescription={htmlDescription}
             orderNote={orderNote}
+            shippingInside={shippingInside}
+            shippingOutside={shippingOutside}
             categoryLinks={categoryLinks}
             seller={seller ? {
                 ...seller,

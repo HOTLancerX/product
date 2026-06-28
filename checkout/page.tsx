@@ -22,7 +22,7 @@ export default function CheckoutPage() {
     const router = useRouter();
     const { success, error } = useToast();
     const { settings } = useSettings();
-    const currencySymbol = settings?.currency_symbol || '';
+    const currencySymbol = settings?.product_currency_symbol || settings?.currency_symbol || '';
 
     const checkoutFields: Array<{ key: string; name: string; desktop: string; mobile: string; required: boolean; status: boolean }> = (() => {
         const raw = settings?.checkout_fields;
@@ -115,6 +115,52 @@ export default function CheckoutPage() {
             setCities([]);
         }
     }, [formData.state, locations]);
+
+    // ── Checkout History: auto-load draft by IP ──────────────────────────────
+    const checkoutHistoryEnabled = settings?.checkout_history_enabled !== 'false';
+    const [draftLoaded, setDraftLoaded] = useState(false);
+
+    useEffect(() => {
+        if (!checkoutHistoryEnabled || draftLoaded) return;
+        fetch('/api/checkout-history', { cache: 'no-store' })
+            .then(r => r.json())
+            .then((data) => {
+                if (data.draft) {
+                    setFormData(prev => ({
+                        ...prev,
+                        name:          data.draft.name          || prev.name,
+                        phone:         data.draft.phone         || prev.phone,
+                        email:         data.draft.email         || prev.email,
+                        address:       data.draft.address       || prev.address,
+                        state:         data.draft.state         || prev.state,
+                        city:          data.draft.city          || prev.city,
+                        zipCode:       data.draft.zipCode       || prev.zipCode,
+                        shippingMethod:(data.draft.shippingMethod as 'inside' | 'outside') || prev.shippingMethod,
+                        paymentMethod: data.draft.paymentMethod || prev.paymentMethod,
+                        notes:         data.draft.notes         || prev.notes,
+                    }));
+                }
+            })
+            .catch(() => {})
+            .finally(() => setDraftLoaded(true));
+    }, [checkoutHistoryEnabled, draftLoaded]);
+
+    // ── Checkout History: auto-save draft on change (debounced) ──────────────
+    useEffect(() => {
+        if (!checkoutHistoryEnabled || !draftLoaded) return;
+        const { name, phone, email } = formData;
+        if (!name && !phone && !email) return;
+
+        const timer = setTimeout(() => {
+            fetch('/api/checkout-history', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(formData),
+            }).catch(() => {});
+        }, 1000);
+
+        return () => clearTimeout(timer);
+    }, [formData, checkoutHistoryEnabled, draftLoaded]);
 
     const fetchUserData = async () => {
         try {
@@ -226,11 +272,21 @@ export default function CheckoutPage() {
         const selectedCartItems = getSelectedItems();
         if (selectedCartItems.length === 0) return 0;
 
+        const freeShippingMin = parseFloat(settings?.product_free_shipping_min as string) || 0;
+        const subtotal = calculateSubtotal();
+        if (freeShippingMin > 0 && subtotal >= freeShippingMin) return 0;
+
+        const globalInsideRate  = parseFloat(settings?.shipping_inside_rate  as string) || 0;
+        const globalOutsideRate = parseFloat(settings?.shipping_outside_rate as string) || 0;
+
         return selectedCartItems.reduce((sum, item) => {
-            const shippingCost = formData.shippingMethod === 'inside'
-                ? (item.shippingInside || 0)
-                : (item.shippingOutside || 0);
-            return sum + shippingCost;
+            let shippingCost: number;
+            if (formData.shippingMethod === 'inside') {
+                shippingCost = item.shippingInside ?? globalInsideRate;
+            } else {
+                shippingCost = item.shippingOutside ?? globalOutsideRate;
+            }
+            return sum + (shippingCost * item.quantity);
         }, 0);
     };
 
@@ -294,6 +350,28 @@ export default function CheckoutPage() {
                 notes: formData.notes,
             };
 
+            // Online payment redirect flow (e.g. Stripe)
+            const selectedGw = paymentGateways.find(g => g.type === formData.paymentMethod);
+            if (selectedGw?.isOnline) {
+                const apiMap: Record<string, string> = { stripe: '/api/stripe/checkout' };
+                const apiEndpoint = apiMap[formData.paymentMethod];
+                if (apiEndpoint) {
+                    const onlineRes = await fetch(apiEndpoint, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(orderData),
+                    });
+                    const onlineData = await onlineRes.json();
+                    if (onlineRes.ok && onlineData.url) {
+                        window.location.href = onlineData.url;
+                        return;
+                    }
+                    error(onlineData.error || 'Failed to initiate payment');
+                    setLoading(false);
+                    return;
+                }
+            }
+
             const res = await fetch('/api/checkout', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -304,6 +382,11 @@ export default function CheckoutPage() {
 
             if (res.ok) {
                 success('Order placed successfully!');
+
+                // Clear checkout history draft after successful order
+                if (checkoutHistoryEnabled) {
+                    fetch('/api/checkout-history', { method: 'DELETE' }).catch(() => {});
+                }
 
                 // Remove ordered items from cart
                 const remainingCart = cart.filter(item => {
@@ -751,39 +834,23 @@ export default function CheckoutPage() {
                                             <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                                                 {paymentGateways.map((gateway) => (
                                                     <div
-                                                        key={gateway.type ?? gateway.id ?? gateway.label}
+                                                        key={gateway.type}
                                                         onClick={() => setFormData(prev => ({ ...prev, paymentMethod: gateway.type }))}
                                                         className={`cursor-pointer border-2 rounded-lg p-4 transition-all ${formData.paymentMethod === gateway.type
                                                             ? 'border-blue-500 bg-blue-50'
                                                             : 'border-gray-200 hover:border-gray-300'
                                                             }`}
                                                     >
-                                                        {gateway.image ? (
-                                                            <img
-                                                                src={gateway.image}
-                                                                alt={gateway.title}
-                                                                className="w-full h-12 object-contain mb-2"
+                                                        <div className="flex items-center justify-center h-12 mb-2">
+                                                            <Icon
+                                                                icon={gateway.icon || 'mdi:credit-card-outline'}
+                                                                width="32"
+                                                                height="32"
+                                                                className="text-gray-600"
                                                             />
-                                                        ) : (
-                                                            <div className="flex items-center justify-center h-12 mb-2">
-                                                                <Icon
-                                                                    icon={
-                                                                        gateway.type === 'cash_on_delivery' ? 'mdi:cash' :
-                                                                            gateway.type === 'mobile_payment' ? 'mdi:cellphone' :
-                                                                                gateway.type === 'bank_transfer' ? 'mdi:bank' :
-                                                                                    gateway.type === 'cryptocurrency' ? 'mdi:bitcoin' :
-                                                                                        gateway.type === 'paypal' ? 'mdi:paypal' :
-                                                                                            gateway.type === 'stripe' ? 'mdi:credit-card' :
-                                                                                                'mdi:credit-card'
-                                                                    }
-                                                                    width="32"
-                                                                    height="32"
-                                                                    className="text-gray-600"
-                                                                />
-                                                            </div>
-                                                        )}
+                                                        </div>
                                                         <div className="text-center">
-                                                            <div className="text-sm font-semibold">{gateway.title}</div>
+                                                            <div className="text-sm font-semibold">{gateway.label || gateway.title}</div>
                                                             {gateway.description && (
                                                                 <div className="text-xs text-gray-500 mt-1 line-clamp-2">
                                                                     {gateway.description}
@@ -796,62 +863,42 @@ export default function CheckoutPage() {
                                         )}
 
                                         {/* Show payment details for selected method */}
-                                        {formData.paymentMethod && paymentGateways.find(g => g.type === formData.paymentMethod) && (
-                                            <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                                                {(() => {
-                                                    const selectedGateway = paymentGateways.find(g => g.type === formData.paymentMethod);
-                                                    if (!selectedGateway) return null;
+                                        {formData.paymentMethod && (() => {
+                                            const sel = paymentGateways.find(g => g.type === formData.paymentMethod);
+                                            if (!sel) return null;
+                                            const hasInstructions = sel.instructions && sel.instructions.trim();
+                                            const hasConfig = sel.config && Object.keys(sel.config).length > 0;
+                                            if (!hasInstructions && !hasConfig) return null;
+                                            return (
+                                                <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg text-sm space-y-2">
+                                                    {hasInstructions && (
+                                                        <div>
+                                                            <p className="font-semibold mb-1">Payment Instructions:</p>
+                                                            <p className="text-gray-700 whitespace-pre-line">{sel.instructions}</p>
+                                                        </div>
+                                                    )}
+                                                    {hasConfig && (
+                                                        <div className="space-y-1">
+                                                            {Object.entries(sel.config as Record<string, string>).map(([key, value]) => {
+                                                                if (!value) return null;
+                                                                const label = key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+                                                                return (
+                                                                    <p key={key}>
+                                                                        {label}: <strong>{value}</strong>
+                                                                    </p>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            );
+                                        })()}
 
-                                                    if (selectedGateway.type === 'mobile_payment' && selectedGateway.config?.mobilePaymentNumber) {
-                                                        return (
-                                                            <div className="text-sm">
-                                                                <p className="font-semibold mb-2">Payment Instructions:</p>
-                                                                <p>Send payment to: <strong>{selectedGateway.config.mobilePaymentProvider}</strong></p>
-                                                                <p>Number: <strong>{selectedGateway.config.mobilePaymentNumber}</strong></p>
-                                                            </div>
-                                                        );
-                                                    }
-
-                                                    if (selectedGateway.type === 'bank_transfer' && selectedGateway.config?.accountNumber) {
-                                                        return (
-                                                            <div className="text-sm">
-                                                                <p className="font-semibold mb-2">Bank Transfer Details:</p>
-                                                                <p>Bank: <strong>{selectedGateway.config.bankName}</strong></p>
-                                                                <p>Account Name: <strong>{selectedGateway.config.accountName}</strong></p>
-                                                                <p>Account Number: <strong>{selectedGateway.config.accountNumber}</strong></p>
-                                                                {selectedGateway.config.routingNumber && (
-                                                                    <p>Routing: <strong>{selectedGateway.config.routingNumber}</strong></p>
-                                                                )}
-                                                            </div>
-                                                        );
-                                                    }
-
-                                                    if (selectedGateway.type === 'cryptocurrency' && selectedGateway.config?.cryptoWalletAddress) {
-                                                        return (
-                                                            <div className="text-sm">
-                                                                <p className="font-semibold mb-2">Cryptocurrency Payment:</p>
-                                                                <p>Currency: <strong>{selectedGateway.config.cryptoCurrency}</strong></p>
-                                                                <p className="break-all">Wallet: <strong>{selectedGateway.config.cryptoWalletAddress}</strong></p>
-                                                            </div>
-                                                        );
-                                                    }
-
-                                                    if (selectedGateway.type === 'cash_on_delivery') {
-                                                        return (
-                                                            <div className="text-sm">
-                                                                <p className="font-semibold mb-2">Cash on Delivery:</p>
-                                                                <p>Pay with cash when your order is delivered to your address.</p>
-                                                            </div>
-                                                        );
-                                                    }
-
-                                                    return null;
-                                                })()}
-                                            </div>
-                                        )}
-
-                                        {/* Payment Proof Fields for specific payment methods */}
-                                        {formData.paymentMethod && ['mobile_payment', 'bank_transfer', 'cryptocurrency'].includes(formData.paymentMethod) && (
+                                        {/* Payment Proof Fields */}
+                                        {formData.paymentMethod && (() => {
+                                            const sel = paymentGateways.find(g => g.type === formData.paymentMethod);
+                                            return sel?.requiresProof;
+                                        })() && (
                                             <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg space-y-4">
                                                 <h3 className="font-semibold text-sm mb-3 flex items-center gap-2">
                                                     <Icon icon="mdi:file-document" width="20" height="20" />
