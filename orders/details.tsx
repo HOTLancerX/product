@@ -156,6 +156,7 @@ export default function AdminOrderDetailPage() {
     const [note,       setNote]       = useState("");
     const [saving,     setSaving]     = useState(false);
     const [saveMsg,    setSaveMsg]    = useState("");
+    const [locationMap, setLocationMap] = useState<Record<string, string>>({});
 
     // ── Fetch order by _id ────────────────────────────────────────────────────
 
@@ -180,6 +181,20 @@ export default function AdminOrderDetailPage() {
     };
 
     useEffect(() => { fetchOrder(); }, [id]);
+
+    useEffect(() => {
+        fetch("/api/location/category?type=location")
+            .then((r) => (r.ok ? r.json() : { categories: [] }))
+            .then((data) => {
+                const map: Record<string, string> = {};
+                for (const loc of data.categories || []) {
+                    const locId = loc.id || loc._id;
+                    if (locId) map[locId] = loc.title;
+                }
+                setLocationMap(map);
+            })
+            .catch(() => {});
+    }, []);
 
     // ── Save ──────────────────────────────────────────────────────────────────
 
@@ -368,7 +383,7 @@ export default function AdminOrderDetailPage() {
                             )}
                             {order.shippingAddress.address && <p>{order.shippingAddress.address}</p>}
                             {(order.shippingAddress.city || order.shippingAddress.state) && (
-                                <p>{[order.shippingAddress.city, order.shippingAddress.state].filter(Boolean).join(", ")}</p>
+                                <p>{[locationMap[order.shippingAddress.city] || order.shippingAddress.city, locationMap[order.shippingAddress.state] || order.shippingAddress.state].filter(Boolean).join(", ")}</p>
                             )}
                             {order.shippingAddress.zipCode && <p>{order.shippingAddress.zipCode}</p>}
                         </div>

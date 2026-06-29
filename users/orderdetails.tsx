@@ -123,6 +123,7 @@ export default function UserOrderDetails() {
     const [order,   setOrder]   = useState<Order | null>(null);
     const [loading, setLoading] = useState(true);
     const [error,   setError]   = useState("");
+    const [locationMap, setLocationMap] = useState<Record<string, string>>({});
 
     // ── Return request state ──────────────────────────────────────────────────
     const [returnRequests,     setReturnRequests]     = useState<any[]>([]);
@@ -161,6 +162,20 @@ export default function UserOrderDetails() {
             .catch(() => setError("Network error — please try again."))
             .finally(() => setLoading(false));
     }, [id]);
+
+    useEffect(() => {
+        fetch("/api/location/category?type=location")
+            .then((r) => (r.ok ? r.json() : { categories: [] }))
+            .then((data) => {
+                const map: Record<string, string> = {};
+                for (const loc of data.categories || []) {
+                    const locId = loc.id || loc._id;
+                    if (locId) map[locId] = loc.title;
+                }
+                setLocationMap(map);
+            })
+            .catch(() => {});
+    }, []);
 
     const handleSubmitReturn = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -446,7 +461,7 @@ export default function UserOrderDetails() {
                             <div>
                                 {order.shippingAddress.address && <p>{order.shippingAddress.address}</p>}
                                 {(order.shippingAddress.city || order.shippingAddress.state) && (
-                                    <p>{[order.shippingAddress.city, order.shippingAddress.state].filter(Boolean).join(", ")}</p>
+                                    <p>{[locationMap[order.shippingAddress.city] || order.shippingAddress.city, locationMap[order.shippingAddress.state] || order.shippingAddress.state].filter(Boolean).join(", ")}</p>
                                 )}
                                 {order.shippingAddress.zipCode && <p>{order.shippingAddress.zipCode}</p>}
                             </div>

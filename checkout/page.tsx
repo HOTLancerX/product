@@ -141,6 +141,31 @@ export default function CheckoutPage() {
         }
     }, [formData.state, locations]);
 
+    // ── Resolve user text-based state/city → location IDs ────────────────
+    useEffect(() => {
+        if (!user || states.length === 0) return;
+        if (!formData.state || locations.some(loc => String(loc.id) === String(formData.state))) return;
+
+        const matchedState = states.find(
+            s => s.title.toLowerCase() === String(formData.state).toLowerCase()
+        );
+        if (matchedState) {
+            setFormData(prev => ({ ...prev, state: matchedState.id, city: '' }));
+        }
+    }, [user, states, locations]);
+
+    useEffect(() => {
+        if (!user || cities.length === 0 || !formData.state) return;
+        if (!formData.city || locations.some(loc => String(loc.id) === String(formData.city))) return;
+
+        const matchedCity = cities.find(
+            c => c.title.toLowerCase() === String(formData.city).toLowerCase()
+        );
+        if (matchedCity) {
+            setFormData(prev => ({ ...prev, city: matchedCity.id }));
+        }
+    }, [user, cities]);
+
     // ── Checkout History: auto-load draft by IP ──────────────────────────────
     const checkoutHistoryEnabled = settings?.checkout_history_enabled !== 'false';
     const [draftLoaded, setDraftLoaded] = useState(false);
@@ -215,7 +240,7 @@ export default function CheckoutPage() {
 
     const fetchLocations = async () => {
         try {
-            const res = await fetch('/api/admin/category?type=location&status=active');
+            const res = await fetch('/api/location/category?type=location&status=published');
             if (res.ok) {
                 const data = await res.json();
                 const locs = (data.categories || []).map((loc: any) => ({
