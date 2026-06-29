@@ -8,6 +8,9 @@ import { getCart, CartItem, clearCart } from '@/plugin/product/lib/cart';
 import { useToast } from '@/components/ui/Toast';
 import Gallery from '@/components/Gallery';
 import useSettings from '@/lib/useSettings';
+import type { FormHooks } from '@/hook';
+import { getHooks } from '@/hook';
+import { reregisterHooks } from '@/hook/PluginList';
 
 interface Location {
     id: string;
@@ -70,6 +73,28 @@ export default function CheckoutPage() {
     const [states, setStates] = useState<Location[]>([]);
     const [cities, setCities] = useState<Location[]>([]);
     const [paymentGateways, setPaymentGateways] = useState<any[]>([]);
+
+    // ── Plugin hook fields for checkout sections ──────────────────────────
+    const [hookTop, setHookTop] = useState<FormHooks>([]);
+    const [hookSection1, setHookSection1] = useState<FormHooks>([]);
+    const [hookSection2, setHookSection2] = useState<FormHooks>([]);
+    const [hookSection3, setHookSection3] = useState<FormHooks>([]);
+    const [hookBottom, setHookBottom] = useState<FormHooks>([]);
+
+    useEffect(() => {
+        fetch('/api/admin-init', { cache: 'no-store' })
+            .then(r => r.json())
+            .then((data: { plugins: { nx: string; status: string }[] }) => {
+                const ids = (data.plugins ?? []).filter(p => p.status === 'active').map(p => p.nx);
+                reregisterHooks(ids);
+                setHookTop(getHooks('checkout.top'));
+                setHookSection1(getHooks('checkout.section1'));
+                setHookSection2(getHooks('checkout.section2'));
+                setHookSection3(getHooks('checkout.section3'));
+                setHookBottom(getHooks('checkout.bottom'));
+            })
+            .catch(() => {});
+    }, []);
 
     const [formData, setFormData] = useState({
         name: '',
@@ -415,7 +440,7 @@ export default function CheckoutPage() {
 
     if (cart.length === 0) {
         return (
-            <div className="container mx-auto px-4 py-16">
+            <div className="container py-16">
                 <div className="max-w-2xl mx-auto text-center">
                     <Icon icon="mdi:cart-outline" width="80" height="80" className="mx-auto mb-4 text-gray-400" />
                     <h1 className="text-2xl font-bold mb-4">Your cart is empty</h1>
@@ -427,12 +452,29 @@ export default function CheckoutPage() {
                         Continue Shopping
                     </button>
                 </div>
+
+                {hookBottom.length > 0 && (
+                    <div className="mt-8 space-y-6">
+                        {hookBottom.map((field) => {
+                            const Component = field.component;
+                            if (!Component) return null;
+                            return <Component key={`${field.key}-${field.position}`} />;
+                        })}
+                    </div>
+                )}
             </div>
         );
     }
 
     return (
         <div className="container py-8">
+            {/* ── Plugin hook: checkout.top ── */}
+            {hookTop.map((field) => {
+                const Component = field.component;
+                if (!Component) return null;
+                return <Component key={`${field.key}-${field.position}`} />;
+            })}
+
             <h1 className="text-3xl font-bold mb-8">Checkout</h1>
 
             <form onSubmit={handleSubmit}>
@@ -573,6 +615,17 @@ export default function CheckoutPage() {
                         </div>
                     </div>
 
+                    {/* ── Plugin hook: checkout.section1 ── */}
+                    {hookSection1.length > 0 && (
+                        <div className="md:col-span-2 space-y-6">
+                            {hookSection1.map((field) => {
+                                const Component = field.component;
+                                if (!Component) return null;
+                                return <Component key={`${field.key}-${field.position}`} />;
+                            })}
+                        </div>
+                    )}
+
                     {/* Right Column - Order Summary */}
                     <div className="md:col-span-1 md:row-span-2 relative">
                         <div className="bg-white rounded-lg shadow p-2 md:p-6 md:sticky top-30">
@@ -613,6 +666,17 @@ export default function CheckoutPage() {
                             </p>
                         </div>
                     </div>
+
+                    {/* ── Plugin hook: checkout.section3 ── */}
+                    {hookSection3.length > 0 && (
+                        <div className="md:col-span-3 space-y-6">
+                            {hookSection3.map((field) => {
+                                const Component = field.component;
+                                if (!Component) return null;
+                                return <Component key={`${field.key}-${field.position}`} />;
+                            })}
+                        </div>
+                    )}
 
                     {/* Left Column - Order Items & Shipping Info */}
                     <div className="md:col-span-2 md:order-1 space-y-6">
@@ -976,8 +1040,30 @@ export default function CheckoutPage() {
                             </div>
                         </div>
                     </div>
+
+                    {/* ── Plugin hook: checkout.section2 ── */}
+                    {hookSection2.length > 0 && (
+                        <div className="md:col-span-3 space-y-6">
+                            {hookSection2.map((field) => {
+                                const Component = field.component;
+                                if (!Component) return null;
+                                return <Component key={`${field.key}-${field.position}`} />;
+                            })}
+                        </div>
+                    )}
                 </div>
             </form>
+
+            {/* ── Plugin hook: checkout.bottom ── */}
+            {hookBottom.length > 0 && (
+                <div className="mt-8 space-y-6">
+                    {hookBottom.map((field) => {
+                        const Component = field.component;
+                        if (!Component) return null;
+                        return <Component key={`${field.key}-${field.position}`} />;
+                    })}
+                </div>
+            )}
         </div>
     );
 }
