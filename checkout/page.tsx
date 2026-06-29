@@ -112,6 +112,17 @@ export default function CheckoutPage() {
         proofImage: '',
     });
 
+    // ── Free delivery discount (set by free-offers plugin via custom event) ──
+    const [discountType, setDiscountType] = useState<'percentage' | 'fixed' | null>(null);
+    const [discountValue, setDiscountValue] = useState(0);
+
+    // ── Upsell discount (set by upsell-trigger plugin via custom event) ──
+    const [upsellDiscount, setUpsellDiscount] = useState(0);
+
+    // ── 24h trigger discount (set by 24h-trigger plugin via custom event) ──
+    const [triggerType, setTriggerType] = useState<string | null>(null);
+    const [triggerValue, setTriggerValue] = useState(0);
+
     useEffect(() => {
         // Load cart
         const currentCart = getCart();
@@ -129,6 +140,35 @@ export default function CheckoutPage() {
 
         // Load payment gateways
         fetchPaymentGateways();
+
+        // Listen for free delivery discount from free-offers plugin
+        const handleDiscount = (e: Event) => {
+            const detail = (e as CustomEvent).detail;
+            setDiscountType(detail?.discountType ?? null);
+            setDiscountValue(typeof detail?.discountValue === 'number' ? detail.discountValue : 0);
+        };
+        window.addEventListener('freeDeliveryDiscount', handleDiscount);
+
+        // Listen for upsell discount from upsell-trigger plugin
+        const handleUpsellDiscount = (e: Event) => {
+            const detail = (e as CustomEvent).detail;
+            setUpsellDiscount(typeof detail?.discount === 'number' ? detail.discount : 0);
+        };
+        window.addEventListener('upsellDiscount', handleUpsellDiscount);
+
+        // Listen for 24h trigger discount
+        const handleTriggerDiscount = (e: Event) => {
+            const detail = (e as CustomEvent).detail;
+            setTriggerType(detail?.triggerType ?? null);
+            setTriggerValue(typeof detail?.triggerValue === 'number' ? detail.triggerValue : 0);
+        };
+        window.addEventListener('triggerDiscount', handleTriggerDiscount);
+
+        return () => {
+            window.removeEventListener('freeDeliveryDiscount', handleDiscount);
+            window.removeEventListener('upsellDiscount', handleUpsellDiscount);
+            window.removeEventListener('triggerDiscount', handleTriggerDiscount);
+        };
     }, []);
 
     useEffect(() => {
@@ -318,7 +358,7 @@ export default function CheckoutPage() {
         return getSelectedItems().reduce((sum, item) => sum + (item.price * item.quantity), 0);
     };
 
-    const calculateShipping = () => {
+    const calculateBaseShipping = () => {
         const selectedCartItems = getSelectedItems();
         if (selectedCartItems.length === 0) return 0;
 
@@ -340,8 +380,31 @@ export default function CheckoutPage() {
         }, 0);
     };
 
+    const calculateShipping = () => {
+        const baseShipping = calculateBaseShipping();
+        if (baseShipping === 0) return 0;
+
+        // 24h trigger: free delivery
+        if (triggerType === 'free_delivery') return 0;
+
+        if (discountType === 'fixed') {
+            return Math.max(0, baseShipping - discountValue);
+        }
+        if (discountType === 'percentage') {
+            return Math.max(0, baseShipping - (baseShipping * discountValue / 100));
+        }
+        return baseShipping;
+    };
+
+    const calculateTriggerDiscount = () => {
+        const sub = calculateSubtotal();
+        if (triggerType === 'fixed_discount') return triggerValue;
+        if (triggerType === 'percentage_discount') return Math.round((sub * triggerValue / 100) * 100) / 100;
+        return 0;
+    };
+
     const calculateTotal = () => {
-        return calculateSubtotal() + calculateShipping();
+        return Math.max(0, calculateSubtotal() + calculateShipping() - upsellDiscount - calculateTriggerDiscount());
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -392,6 +455,9 @@ export default function CheckoutPage() {
                 shippingMethod: formData.shippingMethod,
                 shippingCost: calculateShipping(),
                 subtotal: calculateSubtotal(),
+                upsellDiscount: upsellDiscount,
+                triggerDiscount: calculateTriggerDiscount(),
+                triggerType: triggerType || undefined,
                 total: calculateTotal(),
                 paymentMethod: formData.paymentMethod,
                 transactionId: formData.transactionId,
@@ -437,6 +503,23 @@ export default function CheckoutPage() {
                 if (checkoutHistoryEnabled) {
                     fetch('/api/checkout-history', { method: 'DELETE' }).catch(() => {});
                 }
+
+                // Activate 24h trigger for this user/guest
+                try {
+                    const activateBody: Record<string, string> = {
+                        orderNumber: data.orderNumber,
+                    };
+                    if (user?.id) {
+                        activateBody.identifier = user.id;
+                        activateBody.identifierType = 'user';
+                    }
+                    // For guests: no identifier — server extracts IP from headers
+                    fetch('/api/24h-trigger/activate', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(activateBody),
+                    }).catch(() => {});
+                } catch { /* ignore */ }
 
                 // Remove ordered items from cart
                 const remainingCart = cart.filter(item => {
@@ -668,14 +751,40 @@ export default function CheckoutPage() {
                                 {fieldVisible("shippingMethod") && (
                                 <div className="flex justify-between text-sm">
                                     <span className="text-gray-600">Shipping ({formData.shippingMethod}):</span>
-                                    <span className="font-medium">{fmt(calculateShipping())}</span>
+                                    {discountType && discountValue > 0 ? (
+                                        <div className="text-right">
+                                            <span className="font-medium line-through text-gray-400">{fmt(calculateBaseShipping())}</span>
+                                            <span className="font-medium text-emerald-600 ml-2">{fmt(calculateShipping())}</span>
+                                            <p className="text-[11px] text-emerald-500 mt-0.5">
+                                                {discountType === 'fixed'
+                                                    ? `−${fmt(discountValue)} discount`
+                                                    : `−${discountValue}% discount`
+                                                }
+                                            </p>
+                                        </div>
+                                    ) : (
+                                        <span className="font-medium">{fmt(calculateShipping())}</span>
+                                    )}
                                 </div>
                                 )}
-                            </div>
-
-                            <div className="flex justify-between text-lg font-bold mb-6">
-                                <span>Total:</span>
-                                <span className="text-main">{fmt(calculateTotal())}</span>
+                                {upsellDiscount > 0 && (
+                                <div className="flex justify-between text-sm">
+                                    <span className="text-orange-600 font-medium">Upsell Discount</span>
+                                    <span className="font-semibold text-orange-600">−{fmt(upsellDiscount)}</span>
+                                </div>
+                                )}
+                                {triggerType && calculateTriggerDiscount() > 0 && (
+                                <div className="flex justify-between text-sm">
+                                    <span className="text-amber-600 font-medium">24h Trigger Discount</span>
+                                    <span className="font-semibold text-amber-600">−{fmt(calculateTriggerDiscount())}</span>
+                                </div>
+                                )}
+                                {triggerType === 'free_delivery' && calculateBaseShipping() > 0 && (
+                                <div className="flex justify-between text-sm">
+                                    <span className="text-amber-600 font-medium">24h Trigger</span>
+                                    <span className="font-semibold text-amber-600">Free Delivery</span>
+                                </div>
+                                )}
                             </div>
 
                             <button
