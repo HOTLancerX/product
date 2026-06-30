@@ -130,13 +130,16 @@ export async function PUT(
             { $set, $push: { timeline: timelineEntry } } as any
         );
 
-        // ── Commission credit: create seller pending transaction on delivery ──
+        // ── Commission credit + membership activation on delivery ──
         // Only trigger once — when transitioning INTO "delivered" from a non-delivered status.
         const transitioningToDelivered =
             status === 'delivered' && order.status !== 'delivered';
 
         if (transitioningToDelivered) {
             await createSellerCommissionCredits(order, orderNumber, now);
+            await activateMembershipOnDelivery(order).catch((err) =>
+                console.error('membership activation error:', err)
+            );
         }
 
         const updated = await collection.findOne({ orderNumber });
@@ -254,5 +257,43 @@ async function createSellerCommissionCredits(
     } catch (err) {
         // Log but do not fail the status update
         console.error('createSellerCommissionCredits error:', err);
+    }
+}
+// ── Membership activation on delivery ─────────────────────────────────────────
+
+/**
+ * When an order is delivered, check if any item matches a membership package's
+ * linked productId. If so, activate/renew the buyer's seller membership.
+ */
+async function activateMembershipOnDelivery(order: any): Promise<void> {
+    try {
+        const { getActivePackages } = await import('@/plugin/seller-membership/models/MembershipPackage');
+        const { activateMembership } = await import('@/plugin/seller-membership/models/SellerMembership');
+
+        const packages = await getActivePackages();
+        if (!packages.length) return;
+
+        const buyerUserId = order.userId;
+        if (!buyerUserId) return;
+
+        for (const item of (order.items ?? [])) {
+            const matchedPkg = packages.find((p: any) => p.productId === item.productId);
+            if (!matchedPkg) continue;
+
+            const quantity = item.quantity ?? 1;
+            await activateMembership(
+                buyerUserId,
+                matchedPkg._id,
+                order.orderNumber || '',
+                quantity,
+                matchedPkg.type as 'one-time' | 'monthly' | 'yearly'
+            );
+
+            console.log(
+                `[seller-membership] Activated ${matchedPkg.name} for user ${buyerUserId} (qty: ${quantity}, order: ${order.orderNumber})`
+            );
+        }
+    } catch (err) {
+        console.error('[seller-membership] activateMembershipOnDelivery error:', err);
     }
 }
