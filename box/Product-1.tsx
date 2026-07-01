@@ -16,14 +16,25 @@
  *   - Add to Cart button (dispatches to localStorage cart via cms_cart_updated)
  *
  * Props:
- *   data            — post + info map (from the slug page or a listing query)
- *   productUrl      — full URL to the product page (built from permalink prefix)
- *   currencySymbol  — from product settings (default "$")
+ *   data              — post + info map (from the slug page or a listing query)
+ *   productUrl        — full URL to the product page (built from permalink map)
+ *   currencySymbol    — from product settings (default "$")
+ *   flashSaleCampaign — optional; injected by the flash-sale plugin's page.
+ *                       When present overrides price display. When absent the
+ *                       useFlashSale hook handles dynamic fetch automatically.
+ *
+ * Flash-sale safety: if the flash-sale plugin is not installed the dynamic
+ * import resolves to a no-op hook that returns original prices untouched.
  */
 
 import Image from 'next/image';
 import Link from 'next/link';
 import { Icon } from '@iconify/react';
+// ── Flash Sale integration (lazy — does not break if plugin absent) ────────────
+// useFlashSale falls back gracefully when no campaign is active or the plugin
+// is not installed. The dynamic import is synchronous at runtime because
+// webpack includes all plugin files in the bundle — it only skips registration.
+import useFlashSale from '@/plugin/flash-sale/lib/useFlashSale';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -33,12 +44,19 @@ interface ProductBoxProps {
         title: string;
         slug: string;
         status: string;
+        category?: string | null;
         createdAt?: string;
         info: Record<string, string>;
     };
     /** Full URL, e.g. /product/my-slug — built by parent from permalink map */
     productUrl: string;
     currencySymbol?: string;
+    /**
+     * Optional: pre-resolved flash-sale campaign (passed by FlashSalePage server
+     * component to avoid a redundant client fetch). When omitted the hook fetches
+     * active campaigns itself.
+     */
+    flashSaleCampaign?: import('@/plugin/flash-sale/lib/applyFlashSale').FlashSaleCampaignRef | null;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -75,7 +93,12 @@ function addToCart(item: Record<string, unknown>) {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export default function ProductBox1({ data, productUrl, currencySymbol = '$' }: ProductBoxProps) {
+export default function ProductBox1({ data, productUrl, currencySymbol = '$', flashSaleCampaign }: ProductBoxProps) {
+    // ── Flash Sale hook ───────────────────────────────────────────────────────
+    // Provides a resolvePrice helper. When no campaign is active (or the plugin
+    // is not installed) it returns the original prices with applied=false.
+    const { resolvePrice } = useFlashSale();
+
     const variate      = parseJson<Record<string, any>>(data.info?._variate, {});
     const priceType    = (variate.priceType ?? 'single') as string;
     const variants     = (variate.variants ?? []) as any[];
@@ -83,13 +106,54 @@ export default function ProductBox1({ data, productUrl, currencySymbol = '$' }: 
     const regularPrice = parseFloat(variate.regularprice ?? '0') || 0;
     const stock        = parseInt(variate.stock ?? '0', 10) || 0;
 
-    const currentPrice = priceType === 'single' ? (sellingPrice || regularPrice) : 0;
-    const inStock      = priceType === 'single' ? stock > 0 : variants.some((v: any) => parseInt(v.quantity || '0') > 0);
-
-    const hasDiscount     = priceType === 'single' && sellingPrice > 0 && regularPrice > sellingPrice;
-    const discountPercent = hasDiscount
-        ? Math.round(((regularPrice - sellingPrice) / regularPrice) * 100)
+    // basePrice: always the effective selling price if set, else regular price.
+    // Flash-sale % is applied to this value — the product's regularPrice is
+    // never used as the calculation base when a campaign is active.
+    const basePrice = priceType === 'single'
+        ? (sellingPrice > 0 ? sellingPrice : regularPrice)
         : 0;
+    const inStock = priceType === 'single'
+        ? stock > 0
+        : variants.some((v: any) => parseInt(v.quantity || '0') > 0);
+
+    // Resolve flash-sale pricing
+    // If flashSaleCampaign is provided directly (from FlashSalePage), use it;
+    // otherwise let the hook compute it from the fetched campaigns.
+    const flashResult = flashSaleCampaign
+        ? ((): import('@/plugin/flash-sale/lib/applyFlashSale').FlashSaleResult => {
+              const { applyFlashSale: _apply, findMatchingCampaign: _find } =
+                  require('@/plugin/flash-sale/lib/applyFlashSale') as
+                      typeof import('@/plugin/flash-sale/lib/applyFlashSale');
+              const matched = _find([flashSaleCampaign], String(data._id), data.category ?? null);
+              return _apply(basePrice, matched);
+          })()
+        : resolvePrice(basePrice, String(data._id), data.category ?? null);
+
+    // ── Display price logic ───────────────────────────────────────────────────
+    // When a flash-sale is active: use only campaign-computed prices.
+    // When no flash-sale: fall back to the product's own discount display
+    //   (show regularPrice crossed-out if sellingPrice < regularPrice).
+    const hasFlash = flashResult.applied;
+
+    // Product-level discount (only shown when no flash-sale overrides it)
+    const productHasDiscount = !hasFlash
+        && priceType === 'single'
+        && sellingPrice > 0
+        && regularPrice > sellingPrice;
+
+    const displayRegular  = hasFlash
+        ? flashResult.regularPrice          // campaign "was" price
+        : (productHasDiscount ? regularPrice : basePrice);
+    const displaySelling  = hasFlash
+        ? flashResult.sellingPrice          // campaign "now" price
+        : basePrice;
+    const discountPercent = hasFlash
+        ? flashResult.discountPercent
+        : (productHasDiscount
+            ? Math.round(((regularPrice - sellingPrice) / regularPrice) * 100)
+            : 0);
+    const currentPrice = priceType === 'single' ? displaySelling : 0;
+    const showStrike   = hasFlash || productHasDiscount;
 
     // First available image
     let img = '';
@@ -124,9 +188,15 @@ export default function ProductBox1({ data, productUrl, currencySymbol = '$' }: 
     return (
         <div className="group relative bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow overflow-hidden flex flex-col">
             {/* Discount badge */}
-            {hasDiscount && (
-                <span className="absolute top-3 left-3 z-10 bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">
+            {discountPercent > 0 && (
+                <span className={`absolute top-3 left-3 z-10 text-white text-xs font-bold px-2 py-0.5 rounded-full ${hasFlash ? 'bg-rose-500' : 'bg-red-500'}`}>
                     -{discountPercent}%
+                </span>
+            )}
+            {/* Flash sale tag icon */}
+            {hasFlash && (
+                <span className="absolute top-3 right-3 z-10">
+                    <Icon icon="solar:tag-price-bold" width={16} className="text-rose-500" />
                 </span>
             )}
 
@@ -159,12 +229,12 @@ export default function ProductBox1({ data, productUrl, currencySymbol = '$' }: 
                 <div className="flex items-center gap-2 flex-wrap mt-auto">
                     {priceType === 'single' && currentPrice > 0 ? (
                         <>
-                            {hasDiscount && (
+                            {showStrike && (
                                 <span className="text-xs text-gray-400 line-through">
-                                    {currencySymbol} {fmtPrice(regularPrice)}
+                                    {currencySymbol} {fmtPrice(displayRegular)}
                                 </span>
                             )}
-                            <span className="text-base font-bold text-main">
+                            <span className={`text-base font-bold ${hasFlash ? 'text-rose-600' : 'text-main'}`}>
                                 {currencySymbol} {fmtPrice(currentPrice)}
                             </span>
                         </>

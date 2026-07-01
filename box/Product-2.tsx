@@ -9,11 +9,16 @@
  *   - "Quick View" link replaces the Add to Cart button
  *     (links to the full product page)
  *   - Dark backdrop on image hover reveals title + price smoothly
+ *
+ * Flash-sale safety: if the flash-sale plugin is not installed the dynamic
+ * import resolves to a no-op hook that returns original prices untouched.
  */
 
 import Image from 'next/image';
 import Link from 'next/link';
 import { Icon } from '@iconify/react';
+// ── Flash Sale integration ────────────────────────────────────────────────────
+import useFlashSale from '@/plugin/flash-sale/lib/useFlashSale';
 
 interface ProductBoxProps {
     data: {
@@ -21,11 +26,17 @@ interface ProductBoxProps {
         title: string;
         slug: string;
         status: string;
+        category?: string | null;
         createdAt?: string;
         info: Record<string, string>;
     };
     productUrl: string;
     currencySymbol?: string;
+    /**
+     * Optional: pre-resolved flash-sale campaign injected by FlashSalePage.
+     * When absent the useFlashSale hook auto-fetches active campaigns.
+     */
+    flashSaleCampaign?: import('@/plugin/flash-sale/lib/applyFlashSale').FlashSaleCampaignRef | null;
 }
 
 function parseJson<T>(raw: string | undefined, fallback: T): T {
@@ -58,7 +69,9 @@ function addToCart(item: Record<string, unknown>) {
     } catch { /* localStorage unavailable */ }
 }
 
-export default function ProductBox2({ data, productUrl, currencySymbol = '$' }: ProductBoxProps) {
+export default function ProductBox2({ data, productUrl, currencySymbol = '$', flashSaleCampaign }: ProductBoxProps) {
+    const { resolvePrice } = useFlashSale();
+
     const variate      = parseJson<Record<string, any>>(data.info?._variate, {});
     const priceType    = (variate.priceType ?? 'single') as string;
     const variants     = (variate.variants ?? []) as any[];
@@ -66,15 +79,44 @@ export default function ProductBox2({ data, productUrl, currencySymbol = '$' }: 
     const regularPrice = parseFloat(variate.regularprice ?? '0') || 0;
     const stock        = parseInt(variate.stock ?? '0', 10) || 0;
 
-    const currentPrice = priceType === 'single' ? (sellingPrice || regularPrice) : 0;
-    const inStock      = priceType === 'single'
+    const basePrice = priceType === 'single'
+        ? (sellingPrice > 0 ? sellingPrice : regularPrice)
+        : 0;
+    const inStock = priceType === 'single'
         ? stock > 0
         : variants.some((v: any) => parseInt(v.quantity || '0') > 0);
 
-    const hasDiscount     = priceType === 'single' && sellingPrice > 0 && regularPrice > sellingPrice;
-    const discountPercent = hasDiscount
-        ? Math.round(((regularPrice - sellingPrice) / regularPrice) * 100)
+    // Flash-sale price resolution (same pattern as Product-1)
+    const flashResult = flashSaleCampaign
+        ? ((): import('@/plugin/flash-sale/lib/applyFlashSale').FlashSaleResult => {
+              const { applyFlashSale: _apply, findMatchingCampaign: _find } =
+                  require('@/plugin/flash-sale/lib/applyFlashSale') as
+                      typeof import('@/plugin/flash-sale/lib/applyFlashSale');
+              const matched = _find([flashSaleCampaign], String(data._id), data.category ?? null);
+              return _apply(basePrice, matched);
+          })()
+        : resolvePrice(basePrice, String(data._id), data.category ?? null);
+
+    // ── Display price logic ───────────────────────────────────────────────────
+    const hasFlash = flashResult.applied;
+
+    const productHasDiscount = !hasFlash
+        && priceType === 'single'
+        && sellingPrice > 0
+        && regularPrice > sellingPrice;
+
+    const displayRegular  = hasFlash
+        ? flashResult.regularPrice
+        : (productHasDiscount ? regularPrice : basePrice);
+    const currentPrice    = priceType === 'single'
+        ? (hasFlash ? flashResult.sellingPrice : basePrice)
         : 0;
+    const discountPercent = hasFlash
+        ? flashResult.discountPercent
+        : (productHasDiscount
+            ? Math.round(((regularPrice - sellingPrice) / regularPrice) * 100)
+            : 0);
+    const showStrike = hasFlash || productHasDiscount;
 
     // First available image
     let img = '';
@@ -106,6 +148,7 @@ export default function ProductBox2({ data, productUrl, currencySymbol = '$' }: 
             const pB = selectedAttrs.find((s: any) => s.label === b)?.position ?? 0;
             return pA - pB;
         });
+        void labels; // used below via targetLabel
 
         // Pick colour axis: explicit color displayStyle > any attr with .color values > first
         const getColor = (label: string, value: string) =>
@@ -117,9 +160,7 @@ export default function ProductBox2({ data, productUrl, currencySymbol = '$' }: 
                 return s?.displayStyle === 'color' || s?.displayStyle === 'color-text';
             }) ??
             labels.find(l => Array.from(attrMap[l]).some(v => !!getColor(l, v))) ??
-            labels[0];
-
-        if (targetLabel) {
+            labels[0];        if (targetLabel) {
             const seen = new Set<string>();
             for (const value of Array.from(attrMap[targetLabel]).slice(0, 6)) {
                 const color = getColor(targetLabel, value);
@@ -155,15 +196,22 @@ export default function ProductBox2({ data, productUrl, currencySymbol = '$' }: 
         <div className="group relative rounded-2xl overflow-hidden bg-gray-900 aspect-3/4 flex flex-col cursor-pointer shadow-sm hover:shadow-xl transition-shadow">
 
             {/* Discount badge */}
-            {hasDiscount && (
-                <span className="absolute top-3 left-3 z-20 bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">
+            {discountPercent > 0 && (
+                <span className={`absolute top-3 left-3 z-20 text-white text-xs font-bold px-2 py-0.5 rounded-full ${hasFlash ? 'bg-rose-500' : 'bg-red-500'}`}>
                     -{discountPercent}%
+                </span>
+            )}
+
+            {/* Flash sale tag icon */}
+            {hasFlash && (
+                <span className="absolute top-3 right-3 z-20">
+                    <Icon icon="solar:tag-price-bold" width={16} className="text-rose-400" />
                 </span>
             )}
 
             {/* Out of stock badge */}
             {!inStock && (
-                <span className="absolute top-3 right-3 z-20 bg-black/60 text-white text-xs px-2 py-0.5 rounded-full">
+                <span className={`absolute z-20 bg-black/60 text-white text-xs px-2 py-0.5 rounded-full ${discountPercent > 0 ? 'top-8 right-3' : 'top-3 right-3'}`}>
                     Out of stock
                 </span>
             )}
@@ -215,12 +263,12 @@ export default function ProductBox2({ data, productUrl, currencySymbol = '$' }: 
                 <div className="flex items-center gap-2">
                     {priceType === 'single' && currentPrice > 0 ? (
                         <>
-                            <span className="text-base font-bold text-white">
+                            <span className={`text-base font-bold ${hasFlash ? 'text-rose-300' : 'text-white'}`}>
                                 {currencySymbol} {fmtPrice(currentPrice)}
                             </span>
-                            {hasDiscount && (
+                            {showStrike && (
                                 <span className="text-xs text-white/50 line-through">
-                                    {currencySymbol} {fmtPrice(regularPrice)}
+                                    {currencySymbol} {fmtPrice(displayRegular)}
                                 </span>
                             )}
                         </>
