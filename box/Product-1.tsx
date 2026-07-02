@@ -31,10 +31,8 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { Icon } from '@iconify/react';
 // ── Flash Sale integration (lazy — does not break if plugin absent) ────────────
-// useFlashSale falls back gracefully when no campaign is active or the plugin
-// is not installed. The dynamic import is synchronous at runtime because
-// webpack includes all plugin files in the bundle — it only skips registration.
 import useFlashSale from '@/plugin/flash-sale/lib/useFlashSale';
+import { applyFlashSale } from '@/plugin/flash-sale/lib/applyFlashSale';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -56,7 +54,7 @@ interface ProductBoxProps {
      * component to avoid a redundant client fetch). When omitted the hook fetches
      * active campaigns itself.
      */
-    flashSaleCampaign?: import('@/plugin/flash-sale/lib/applyFlashSale').FlashSaleCampaignRef | null;
+    flashSaleCampaign?: import('@/plugin/flash-sale/lib/applyFlashSale').FlashSaleCampaignFull | null;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -120,13 +118,7 @@ export default function ProductBox1({ data, productUrl, currencySymbol = '$', fl
     // If flashSaleCampaign is provided directly (from FlashSalePage), use it;
     // otherwise let the hook compute it from the fetched campaigns.
     const flashResult = flashSaleCampaign
-        ? ((): import('@/plugin/flash-sale/lib/applyFlashSale').FlashSaleResult => {
-              const { applyFlashSale: _apply, findMatchingCampaign: _find } =
-                  require('@/plugin/flash-sale/lib/applyFlashSale') as
-                      typeof import('@/plugin/flash-sale/lib/applyFlashSale');
-              const matched = _find([flashSaleCampaign], String(data._id), data.category ?? null);
-              return _apply(basePrice, matched);
-          })()
+        ? applyFlashSale(basePrice, flashSaleCampaign)
         : resolvePrice(basePrice, String(data._id), data.category ?? null);
 
     // ── Display price logic ───────────────────────────────────────────────────

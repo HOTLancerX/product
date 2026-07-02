@@ -267,8 +267,17 @@ async function createSellerCommissionCredits(
  */
 async function activateMembershipOnDelivery(order: any): Promise<void> {
     try {
-        const { getActivePackages } = await import('@/plugin/seller-membership/models/MembershipPackage');
-        const { activateMembership } = await import('@/plugin/seller-membership/models/SellerMembership');
+        // Dynamic requires bypass static type-checking so the product plugin
+        // compiles cleanly whether or not seller-membership is installed.
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const pkgMod = require('@/plugin/seller-membership/models/MembershipPackage') as
+            { getActivePackages: () => Promise<any[]> };
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        const memMod = require('@/plugin/seller-membership/models/SellerMembership') as
+            { activateMembership: (userId: string, packageId: string, orderNumber: string, quantity: number, type: 'one-time' | 'monthly' | 'yearly') => Promise<void> };
+
+        const { getActivePackages } = pkgMod;
+        const { activateMembership } = memMod;
 
         const packages = await getActivePackages();
         if (!packages.length) return;

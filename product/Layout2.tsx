@@ -71,7 +71,9 @@ export default function ProductLayout2({ data, settings = {}, permalinkMap = {},
     const discountPercent = hasDiscount
         ? Math.round(((regularPrice - sellingPrice) / regularPrice) * 100)
         : 0;
-    const displayPrice    = priceType === 'single' ? (sellingPrice || regularPrice) : 0;
+    const displayPrice = priceType === 'single'
+        ? (sellingPrice > 0 ? sellingPrice : regularPrice)
+        : 0;
 
     const ancestors  = pageData?.ancestors ?? [];
     const catPrefix  = (permalinkMap['product-category'] ?? 'product/category')
@@ -85,6 +87,8 @@ export default function ProductLayout2({ data, settings = {}, permalinkMap = {},
         <ProductClient
             layout={2}
             data={{ id: String(data._id), title: data.title, slug: data.slug }}
+            productId={String(data._id)}
+            categoryId={data.category ?? null}
             priceType={priceType}
             regularPrice={regularPrice}
             sellingPrice={sellingPrice}

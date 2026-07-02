@@ -94,10 +94,11 @@ async function getProductsInCategory(catId: string): Promise<CategoryProduct[]> 
     }
 
     return posts.map((p: any) => ({
-        _id:   String(p._id),
-        title: p.title ?? "",
-        slug:  p.slug  ?? "",
-        info:  infoByPost[String(p._id)] ?? {},
+        _id:      String(p._id),
+        title:    p.title ?? "",
+        slug:     p.slug  ?? "",
+        category: p.category ? String(p.category) : null,
+        info:     infoByPost[String(p._id)] ?? {},
     }));
 }
 

@@ -6,10 +6,12 @@
  */
 
 export interface CategoryProduct {
-    _id:   string;
-    title: string;
-    slug:  string;
-    info:  Record<string, string>;
+    _id:      string;
+    title:    string;
+    slug:     string;
+    /** MongoDB _id of the product's assigned category (string) */
+    category: string | null;
+    info:     Record<string, string>;
 }
 
 export interface CategorySubCat {

@@ -18,6 +18,7 @@ import { useToast } from '@/components/ui/Toast';
 import Slider from './Slider';
 import Variant from './Variant';
 import Specification from './Specification';
+import useFlashSale from '@/plugin/flash-sale/lib/useFlashSale';
 
 const Compare = dynamic(() => import('@/plugin/compare/ui/Compare'), { ssr: false });
 
@@ -26,6 +27,10 @@ const Compare = dynamic(() => import('@/plugin/compare/ui/Compare'), { ssr: fals
 export interface ProductClientProps {
     layout: 1 | 2;
     data: { id: string; title: string; slug: string };
+    /** MongoDB _id — used by the flash-sale hook to match campaigns */
+    productId?: string;
+    /** Category _id — used by the flash-sale hook for category-wise campaigns */
+    categoryId?: string | null;
     priceType: 'single' | 'variant';
     regularPrice: number;
     sellingPrice: number;
@@ -91,6 +96,8 @@ interface ShellProps {
     currencySymbol: string;
     variants: any[];
     categoryLinks: { title: string; url: string }[];
+    /** Flash-sale campaign that matched this product, or null */
+    flashSaleBanner?: import('@/plugin/flash-sale/lib/applyFlashSale').FlashSaleCampaignFull | null;
 }
 
 // ── Cart ──────────────────────────────────────────────────────────────────────
@@ -169,6 +176,8 @@ function fmtPrice(n: number) {
 export default function ProductClient({
     layout,
     data,
+    productId,
+    categoryId,
     priceType,
     regularPrice,
     displayPrice,
@@ -195,6 +204,25 @@ export default function ProductClient({
     seller = null,
 }: ProductClientProps) {
     const { success, error } = useToast();
+
+    // ── Flash Sale ────────────────────────────────────────────────────────────
+    const { resolvePrice } = useFlashSale();
+    // displayPrice is already sellingPrice > 0 ? sellingPrice : regularPrice
+    const flashResult = resolvePrice(
+        displayPrice,
+        productId ?? data.id,
+        categoryId ?? null
+    );
+    const hasFlash        = flashResult.applied;
+    // When flash is active use campaign prices; otherwise keep original logic
+    const effectivePrice  = hasFlash ? flashResult.sellingPrice  : displayPrice;
+    const effectiveRegular = hasFlash ? flashResult.regularPrice : regularPrice;
+    const effectiveDiscount = hasFlash
+        ? flashResult.discountPercent
+        : discountPercent;
+    const effectiveHasDiscount = hasFlash
+        ? true
+        : (hasDiscount || (hasFlash && flashResult.regularPrice > flashResult.sellingPrice));
 
     // ── Variant selection ─────────────────────────────────────────────────────
     const [selectedVariant, setSelectedVariant] = useState<any>(
@@ -236,7 +264,7 @@ export default function ProductClient({
 
     // ── Price & stock ─────────────────────────────────────────────────────────
     const currentPrice = useMemo(() => {
-        if (priceType === 'single') return displayPrice;
+        if (priceType === 'single') return effectivePrice;
         if (!selectedVariant)       return 0;
         // Handle tiered pricing: pick the tier matching current quantity
         if (selectedVariant.priceTiers?.length > 0) {
@@ -248,7 +276,7 @@ export default function ProductClient({
             if (tier) return parseFloat(tier.price) || 0;
         }
         return parseFloat(selectedVariant.price || '0') || 0;
-    }, [priceType, displayPrice, selectedVariant]);
+    }, [priceType, effectivePrice, selectedVariant]);
 
     const currentStock = useMemo(() => {
         if (priceType === 'single') return singleStock;
@@ -333,7 +361,10 @@ export default function ProductClient({
 
     // ── Shell props ───────────────────────────────────────────────────────────
     const shellProps: ShellProps = {
-        data, priceType, regularPrice, hasDiscount, discountPercent,
+        data, priceType,
+        regularPrice: effectiveRegular,
+        hasDiscount: effectiveHasDiscount,
+        discountPercent: effectiveDiscount,
         currentPrice, currentStock, quantity, noteValue, setNoteValue,
         dec, inc, setQuantity, gallery, attributes, selectedOptions,
         selectedVariant, variantDisplayStyle, handleOptionSelect,
@@ -341,6 +372,7 @@ export default function ProductClient({
         whatsappNumber, facebookPageId, telegramUsername,
         shortDescription, orderNote, currencySymbol, variants,
         categoryLinks,
+        flashSaleBanner: hasFlash ? flashResult.campaign : null,
     };
 
     // ── Render ────────────────────────────────────────────────────────────────
@@ -482,7 +514,7 @@ function Layout1Shell(props: ShellProps) {
         handleAddToCart, handleBuyNow, handleSocial, socialCount,
         whatsappNumber, facebookPageId, telegramUsername,
         shortDescription, orderNote, currencySymbol, variants,
-        categoryLinks,
+        categoryLinks, flashSaleBanner,
     } = props;
 
     const inStock = currentStock > 0;
@@ -524,6 +556,31 @@ function Layout1Shell(props: ShellProps) {
                     {shortDescription && (
                         <div className="text-gray-600 description"
                             dangerouslySetInnerHTML={{ __html: shortDescription }} />
+                    )}
+
+                    {/* Flash Sale banner — shown when a campaign matches this product */}
+                    {flashSaleBanner && (
+                        <Link href="/flash-sale"
+                            className="flex items-center gap-3 px-4 py-2.5 rounded-xl bg-linear-to-r from-rose-500 to-pink-600 text-white no-underline hover:opacity-90 transition">
+                            {flashSaleBanner.image ? (
+                                <img src={flashSaleBanner.image} alt=""
+                                    className="w-8 h-8 rounded-lg object-cover shrink-0" />
+                            ) : flashSaleBanner.icon ? (
+                                <Icon icon={flashSaleBanner.icon} width={22} className="shrink-0" />
+                            ) : (
+                                <Icon icon="solar:tag-price-bold" width={22} className="shrink-0" />
+                            )}
+                            <div className="flex-1 min-w-0">
+                                <p className="text-xs font-semibold opacity-80 uppercase tracking-wide">
+                                    Flash Sale
+                                </p>
+                                <p className="text-sm font-bold truncate">{flashSaleBanner.name}</p>
+                            </div>
+                            <span className="shrink-0 bg-white/20 text-white text-xs font-bold px-2.5 py-1 rounded-full">
+                                {flashSaleBanner.percentage}% OFF
+                            </span>
+                            <Icon icon="solar:arrow-right-bold" width={16} className="shrink-0 opacity-70" />
+                        </Link>
                     )}
 
                     {/* Price — only when > 0 */}
@@ -642,6 +699,7 @@ function Layout2Shell(props: ShellProps) {
         handleAddToCart, handleBuyNow, handleSocial, socialCount,
         whatsappNumber, facebookPageId, telegramUsername,
         shortDescription, orderNote, currencySymbol, variants,
+        flashSaleBanner,
     } = props;
 
     const inStock = currentStock > 0;
@@ -672,6 +730,29 @@ function Layout2Shell(props: ShellProps) {
                             {shortDescription && (
                                 <div className="text-gray-400 description text-sm leading-relaxed"
                                     dangerouslySetInnerHTML={{ __html: shortDescription }} />
+                            )}
+
+                            {/* Flash Sale banner */}
+                            {flashSaleBanner && (
+                                <a href="/flash-sale"
+                                    className="flex items-center gap-3 px-4 py-2.5 rounded-xl bg-linear-to-r from-rose-500 to-pink-600 text-white no-underline hover:opacity-90 transition">
+                                    {flashSaleBanner.image ? (
+                                        <img src={flashSaleBanner.image} alt=""
+                                            className="w-8 h-8 rounded-lg object-cover shrink-0" />
+                                    ) : flashSaleBanner.icon ? (
+                                        <Icon icon={flashSaleBanner.icon} width={22} className="shrink-0" />
+                                    ) : (
+                                        <Icon icon="solar:tag-price-bold" width={22} className="shrink-0" />
+                                    )}
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-xs font-semibold opacity-80 uppercase tracking-wide">Flash Sale</p>
+                                        <p className="text-sm font-bold truncate">{flashSaleBanner.name}</p>
+                                    </div>
+                                    <span className="shrink-0 bg-white/20 text-white text-xs font-bold px-2.5 py-1 rounded-full">
+                                        {flashSaleBanner.percentage}% OFF
+                                    </span>
+                                    <Icon icon="solar:arrow-right-bold" width={16} className="shrink-0 opacity-70" />
+                                </a>
                             )}
 
                             {/* Price */}

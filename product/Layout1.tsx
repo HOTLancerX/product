@@ -4,9 +4,10 @@
  * Server component. Receives `data`, `settings`, `permalinkMap`, and
  * `pageData` from the slug page router.
  *
- * `pageData.ancestors` contains the category breadcrumb chain (root → leaf)
- * fetched server-side by serverHooks.ts via getCategoryAncestors().
- * No HTTP fetch here — direct DB call via the hook system.
+ * Price rule:
+ *   basePrice = sellingPrice > 0 ? sellingPrice : regularPrice
+ *   Flash-sale (if active) is applied on top of basePrice in ProductClient
+ *   via the useFlashSale hook — no server-side price mutation needed here.
  */
 
 import ProductClient from './ProductClient';
@@ -82,7 +83,11 @@ export default function ProductLayout1({ data, settings = {}, permalinkMap = {},
     const discountPercent = hasDiscount
         ? Math.round(((regularPrice - sellingPrice) / regularPrice) * 100)
         : 0;
-    const displayPrice    = priceType === 'single' ? (sellingPrice || regularPrice) : 0;
+    // displayPrice: the effective base price — sellingPrice takes priority.
+    // Flash-sale adjustments are applied client-side via useFlashSale hook.
+    const displayPrice = priceType === 'single'
+        ? (sellingPrice > 0 ? sellingPrice : regularPrice)
+        : 0;
 
     // ── Category breadcrumb from pageData (injected server-side, no fetch) ──
     const ancestors  = pageData?.ancestors ?? [];
@@ -102,6 +107,8 @@ export default function ProductLayout1({ data, settings = {}, permalinkMap = {},
         <ProductClient
             layout={1}
             data={{ id: String(data._id), title: data.title, slug: data.slug }}
+            productId={String(data._id)}
+            categoryId={data.category ?? null}
             priceType={priceType}
             regularPrice={regularPrice}
             sellingPrice={sellingPrice}

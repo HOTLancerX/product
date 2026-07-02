@@ -19,6 +19,7 @@ import Link from 'next/link';
 import { Icon } from '@iconify/react';
 // ── Flash Sale integration ────────────────────────────────────────────────────
 import useFlashSale from '@/plugin/flash-sale/lib/useFlashSale';
+import { applyFlashSale } from '@/plugin/flash-sale/lib/applyFlashSale';
 
 interface ProductBoxProps {
     data: {
@@ -36,7 +37,7 @@ interface ProductBoxProps {
      * Optional: pre-resolved flash-sale campaign injected by FlashSalePage.
      * When absent the useFlashSale hook auto-fetches active campaigns.
      */
-    flashSaleCampaign?: import('@/plugin/flash-sale/lib/applyFlashSale').FlashSaleCampaignRef | null;
+    flashSaleCampaign?: import('@/plugin/flash-sale/lib/applyFlashSale').FlashSaleCampaignFull | null;
 }
 
 function parseJson<T>(raw: string | undefined, fallback: T): T {
@@ -86,15 +87,9 @@ export default function ProductBox2({ data, productUrl, currencySymbol = '$', fl
         ? stock > 0
         : variants.some((v: any) => parseInt(v.quantity || '0') > 0);
 
-    // Flash-sale price resolution (same pattern as Product-1)
+    // Flash-sale price resolution
     const flashResult = flashSaleCampaign
-        ? ((): import('@/plugin/flash-sale/lib/applyFlashSale').FlashSaleResult => {
-              const { applyFlashSale: _apply, findMatchingCampaign: _find } =
-                  require('@/plugin/flash-sale/lib/applyFlashSale') as
-                      typeof import('@/plugin/flash-sale/lib/applyFlashSale');
-              const matched = _find([flashSaleCampaign], String(data._id), data.category ?? null);
-              return _apply(basePrice, matched);
-          })()
+        ? applyFlashSale(basePrice, flashSaleCampaign)
         : resolvePrice(basePrice, String(data._id), data.category ?? null);
 
     // ── Display price logic ───────────────────────────────────────────────────

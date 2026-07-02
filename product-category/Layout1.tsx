@@ -224,6 +224,9 @@ export default function ProductCategoryLayout1({
 
     const catImage        = data.info?.cat_image ?? '';
     const breadcrumbLinks = ancestors.slice(0, -1);
+    // The current category _id — used as fallback for products that lack a
+    // category field (shouldn't happen, but defensive).
+    const currentCatId = data._id;
 
     // ── Render product cards (pure server JSX) ────────────────────────────────
     const cardGrid = products.length === 0 ? (
@@ -241,7 +244,7 @@ export default function ProductCategoryLayout1({
                 BoxComponent ? (
                     <BoxComponent
                         key={product._id}
-                        data={product}
+                        data={{ ...product, category: product.category ?? currentCatId }}
                         productUrl={buildUrl(productPrefix, product.slug)}
                         currencySymbol={currencySymbol}
                     />

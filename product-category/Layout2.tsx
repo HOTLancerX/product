@@ -196,6 +196,7 @@ export default function ProductCategoryLayout2({
 
     const catImage        = data.info?.cat_image ?? '';
     const breadcrumbLinks = ancestors.slice(0, -1);
+    const currentCatId    = data._id;
 
     const cardGrid = products.length === 0 ? (
         <div className="text-center py-20 text-white/40">
@@ -212,7 +213,7 @@ export default function ProductCategoryLayout2({
                 BoxComponent ? (
                     <BoxComponent
                         key={product._id}
-                        data={product}
+                        data={{ ...product, category: product.category ?? currentCatId }}
                         productUrl={buildUrl(productPrefix, product.slug)}
                         currencySymbol={currencySymbol}
                     />
