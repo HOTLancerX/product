@@ -17,9 +17,8 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { Icon } from '@iconify/react';
-// ── Flash Sale integration ────────────────────────────────────────────────────
-import useFlashSale from '@/plugin/flash-sale/lib/useFlashSale';
-import { applyFlashSale } from '@/plugin/flash-sale/lib/applyFlashSale';
+// ── Flash Sale integration (safe — no-op when plugin is absent) ───────────────
+import { useFlashSale, applyFlashSale } from './flashSaleOptional';
 
 interface ProductBoxProps {
     data: {
@@ -37,7 +36,7 @@ interface ProductBoxProps {
      * Optional: pre-resolved flash-sale campaign injected by FlashSalePage.
      * When absent the useFlashSale hook auto-fetches active campaigns.
      */
-    flashSaleCampaign?: import('@/plugin/flash-sale/lib/applyFlashSale').FlashSaleCampaignFull | null;
+    flashSaleCampaign?: import('./flashSaleOptional').FlashSaleCampaignFull | null;
 }
 
 function parseJson<T>(raw: string | undefined, fallback: T): T {

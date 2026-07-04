@@ -31,8 +31,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { Icon } from '@iconify/react';
 // ── Flash Sale integration (lazy — does not break if plugin absent) ────────────
-import useFlashSale from '@/plugin/flash-sale/lib/useFlashSale';
-import { applyFlashSale } from '@/plugin/flash-sale/lib/applyFlashSale';
+import { useFlashSale, applyFlashSale } from './flashSaleOptional';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -54,7 +53,7 @@ interface ProductBoxProps {
      * component to avoid a redundant client fetch). When omitted the hook fetches
      * active campaigns itself.
      */
-    flashSaleCampaign?: import('@/plugin/flash-sale/lib/applyFlashSale').FlashSaleCampaignFull | null;
+    flashSaleCampaign?: import('./flashSaleOptional').FlashSaleCampaignFull | null;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
