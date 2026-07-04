@@ -18,7 +18,7 @@ import { useToast } from '@/components/ui/Toast';
 import Slider from './Slider';
 import Variant from './Variant';
 import Specification from './Specification';
-import useFlashSale from '@/plugin/flash-sale/lib/useFlashSale';
+import { useFlashSaleOptional } from './useFlashSaleOptional';
 
 const Compare = dynamic(() => import('@/plugin/compare/ui/Compare'), { ssr: false });
 
@@ -206,7 +206,7 @@ export default function ProductClient({
     const { success, error } = useToast();
 
     // ── Flash Sale ────────────────────────────────────────────────────────────
-    const { resolvePrice } = useFlashSale();
+    const { resolvePrice } = useFlashSaleOptional();
     // displayPrice is already sellingPrice > 0 ? sellingPrice : regularPrice
     const flashResult = resolvePrice(
         displayPrice,
