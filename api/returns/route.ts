@@ -30,8 +30,6 @@ import {
     getOrdersCollection,
     initializeOrdersCollection,
 } from "@/plugin/product/models/Order";
-import { getTransactionModel } from "@/plugin/seller/models/Transaction";
-import { updateWallet } from "@/plugin/seller/models/Wallet";
 import PostInfo from "@/models/post_info";
 import mongoose from "mongoose";
 
@@ -299,46 +297,56 @@ export async function PUT(req: NextRequest): Promise<Response> {
 
             // 2. Reverse seller wallet transactions for this order
             //    Find ALL seller credit transactions for this order
-            const TxModel = getTransactionModel();
-            const sellerTxs = await TxModel.find({
-                orderNumber: returnReq.orderNumber,
-                type:        "credit",
-                status:      { $in: ["pending", "available"] },
-            }).lean() as any[];
+            //    Lazy-load seller models — seller plugin may not be installed.
+            let TxModel: any = null;
+            let updateWalletFn: ((userId: string, inc: Record<string, number>) => Promise<void>) | null = null;
+            try {
+                const [txMod, walletMod] = await Promise.all([
+                    import("@/plugin/seller/models/Transaction"),
+                    import("@/plugin/seller/models/Wallet"),
+                ]);
+                TxModel         = txMod.getTransactionModel();
+                updateWalletFn  = walletMod.updateWallet;
+            } catch {
+                // Seller plugin not installed — skip wallet reversal
+            }
 
-            for (const tx of sellerTxs) {
-                if (tx.status === "pending") {
-                    // Still in hold — just cancel it, reduce pendingBalance
-                    await TxModel.updateOne(
-                        { _id: tx._id },
-                        { $set: { status: "cancelled", note: `Reversed: return approved for order ${returnReq.orderNumber}` } }
-                    );
-                    await updateWallet(tx.userId, { pendingBalance: -tx.amount });
-                } else if (tx.status === "available") {
-                    // Already released to balance — deduct from balance
-                    // 90% rule: the seller already received their commission-reduced amount.
-                    // Reverse the full credited amount from balance.
-                    await TxModel.updateOne(
-                        { _id: tx._id },
-                        { $set: { status: "cancelled", note: `Reversed: return approved for order ${returnReq.orderNumber}` } }
-                    );
-                    await updateWallet(tx.userId, { balance: -tx.amount, totalEarned: -tx.amount });
+            if (TxModel && updateWalletFn) {
+                const sellerTxs = await TxModel.find({
+                    orderNumber: returnReq.orderNumber,
+                    type:        "credit",
+                    status:      { $in: ["pending", "available"] },
+                }).lean() as any[];
 
-                    // Create a debit transaction for the reversal record
-                    await TxModel.create({
-                        userId:         tx.userId,
-                        orderId:        tx.orderId,
-                        orderNumber:    returnReq.orderNumber,
-                        type:           "debit",
-                        status:         "paid",
-                        gross:          tx.gross,
-                        commissionRate: tx.commissionRate,
-                        adminAmount:    tx.adminAmount,
-                        amount:         tx.amount,
-                        note:           `Return refund reversal for order ${returnReq.orderNumber}`,
-                        createdAt:      now,
-                        updatedAt:      now,
-                    });
+                for (const tx of sellerTxs) {
+                    if (tx.status === "pending") {
+                        await TxModel.updateOne(
+                            { _id: tx._id },
+                            { $set: { status: "cancelled", note: `Reversed: return approved for order ${returnReq.orderNumber}` } }
+                        );
+                        await updateWalletFn(tx.userId, { pendingBalance: -tx.amount });
+                    } else if (tx.status === "available") {
+                        await TxModel.updateOne(
+                            { _id: tx._id },
+                            { $set: { status: "cancelled", note: `Reversed: return approved for order ${returnReq.orderNumber}` } }
+                        );
+                        await updateWalletFn(tx.userId, { balance: -tx.amount, totalEarned: -tx.amount });
+
+                        await TxModel.create({
+                            userId:         tx.userId,
+                            orderId:        tx.orderId,
+                            orderNumber:    returnReq.orderNumber,
+                            type:           "debit",
+                            status:         "paid",
+                            gross:          tx.gross,
+                            commissionRate: tx.commissionRate,
+                            adminAmount:    tx.adminAmount,
+                            amount:         tx.amount,
+                            note:           `Return refund reversal for order ${returnReq.orderNumber}`,
+                            createdAt:      now,
+                            updatedAt:      now,
+                        });
+                    }
                 }
             }
 
