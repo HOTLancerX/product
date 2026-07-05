@@ -11,7 +11,6 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { Icon } from '@iconify/react';
 import { useToast } from '@/components/ui/Toast';
@@ -20,7 +19,17 @@ import Variant from './Variant';
 import Specification from './Specification';
 import { useFlashSaleOptional } from './useFlashSaleOptional';
 
-const Compare = dynamic(() => import('@/plugin/compare/ui/Compare'), { ssr: false });
+// Compare component — optional, only loaded when the compare plugin is installed.
+// Using require() in a try/catch so webpack does not hard-error when the module
+// is absent. Falls back to null (renders nothing) when not installed.
+let _CompareMod: any = null;
+try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    _CompareMod = require('@/plugin/compare/ui/Compare');
+} catch { /* compare plugin not installed */ }
+
+const Compare: React.ComponentType<any> | null =
+    _CompareMod?.default ?? _CompareMod ?? null;
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -462,7 +471,7 @@ function CompareSection({ currentId, currentSlug, compareIds, currencySymbol }: 
                     <span>Loading comparison…</span>
                 </div>
             )}
-            {compareData && (
+            {compareData && Compare && (
                 <Compare
                     current={compareData.current}
                     compareProducts={compareData.compareProducts}
