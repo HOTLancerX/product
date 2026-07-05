@@ -18,18 +18,9 @@ import Slider from './Slider';
 import Variant from './Variant';
 import Specification from './Specification';
 import { useFlashSaleOptional } from './useFlashSaleOptional';
+import dynamic from 'next/dynamic';
 
-// Compare component — optional, only loaded when the compare plugin is installed.
-// Using require() in a try/catch so webpack does not hard-error when the module
-// is absent. Falls back to null (renders nothing) when not installed.
-let _CompareMod: any = null;
-try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    _CompareMod = require('@/plugin/compare/ui/Compare');
-} catch { /* compare plugin not installed */ }
-
-const Compare: React.ComponentType<any> | null =
-    _CompareMod?.default ?? _CompareMod ?? null;
+const Compare = dynamic(() => import('@/plugin/compare/ui/Compare'), { ssr: false });
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -106,7 +97,7 @@ interface ShellProps {
     variants: any[];
     categoryLinks: { title: string; url: string }[];
     /** Flash-sale campaign that matched this product, or null */
-    flashSaleBanner?: import('@/plugin/flash-sale/lib/applyFlashSale').FlashSaleCampaignFull | null;
+    flashSaleBanner?: any | null;
 }
 
 // ── Cart ──────────────────────────────────────────────────────────────────────
@@ -471,7 +462,7 @@ function CompareSection({ currentId, currentSlug, compareIds, currencySymbol }: 
                     <span>Loading comparison…</span>
                 </div>
             )}
-            {compareData && Compare && (
+            {compareData && (
                 <Compare
                     current={compareData.current}
                     compareProducts={compareData.compareProducts}

@@ -3,33 +3,18 @@
 /**
  * plugin/product/box/flashSaleOptional.ts
  *
- * Safe re-exports of flash-sale utilities for the product box components.
- * When the flash-sale plugin is not installed these fall back to no-ops so
- * the build never errors and product cards work normally without the plugin.
+ * Re-exports flash-sale utilities for the product box components.
+ * When the flash-sale plugin is absent, next.config.ts aliases both modules
+ * to lib/optional-plugin-stub.ts which exports `undefined` for everything.
+ * The null-guards in useFlashSale() and applyFlashSale() handle that gracefully.
  */
 
-// ── Shared types (duplicated so this file has zero hard dependencies) ─────────
+import _useFlashSale from "@/plugin/flash-sale/lib/useFlashSale";
+import { applyFlashSale as _applyFlashSale } from "@/plugin/flash-sale/lib/applyFlashSale";
 
-export interface FlashSaleCampaignFull {
-    _id:        string;
-    name:       string;
-    percentage: number;
-    saleType:   "real" | "fake";
-    scope:      "all" | "categories" | "products";
-    productIds: string[];
-    categoryIds: string[];
-    image?:     string;
-    icon?:      string;
-    [key: string]: any;
-}
+// ── Types (re-exported for consumers) ────────────────────────────────────────
 
-export interface FlashSaleResult {
-    applied:          boolean;
-    regularPrice:     number;
-    sellingPrice:     number;
-    discountPercent:  number;
-    campaign:         FlashSaleCampaignFull | null;
-}
+export type { FlashSaleCampaignFull, FlashSaleResult } from "@/plugin/flash-sale/lib/applyFlashSale";
 
 export interface UseFlashSaleReturn {
     ready:        boolean;
@@ -40,7 +25,9 @@ export interface UseFlashSaleReturn {
     ) => FlashSaleResult;
 }
 
-// ── No-op fallback ────────────────────────────────────────────────────────────
+import type { FlashSaleResult, FlashSaleCampaignFull } from "@/plugin/flash-sale/lib/applyFlashSale";
+
+// ── No-op fallbacks used when stub is resolved ────────────────────────────────
 
 function noopResolve(originalPrice: number): FlashSaleResult {
     return {
@@ -49,58 +36,34 @@ function noopResolve(originalPrice: number): FlashSaleResult {
     };
 }
 
+import { useState } from "react";
+
 function useNoopFlashSale(): UseFlashSaleReturn {
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    useState(false); // keep hook call count stable
     return { ready: true, resolvePrice: noopResolve };
 }
 
-function noopApply(originalPrice: number, _campaign: any): FlashSaleResult {
-    return {
-        applied: false, regularPrice: originalPrice,
-        sellingPrice: originalPrice, discountPercent: 0, campaign: null,
-    };
-}
-
-// ── Load real implementations once at module evaluation time ──────────────────
-
-let realHook:  (() => UseFlashSaleReturn) | null = null;
-let realApply: ((originalPrice: number, campaign: FlashSaleCampaignFull) => FlashSaleResult) | null = null;
-
-try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const hookMod = require("@/plugin/flash-sale/lib/useFlashSale");
-    if (typeof hookMod?.default === "function") {
-        realHook = hookMod.default as () => UseFlashSaleReturn;
-    }
-} catch { /* plugin not installed */ }
-
-try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const applyMod = require("@/plugin/flash-sale/lib/applyFlashSale");
-    if (typeof applyMod?.applyFlashSale === "function") {
-        realApply = applyMod.applyFlashSale as (
-            originalPrice: number,
-            campaign: FlashSaleCampaignFull
-        ) => FlashSaleResult;
-    }
-} catch { /* plugin not installed */ }
-
 // ── Public exports ────────────────────────────────────────────────────────────
 
-/** Drop-in replacement for `useFlashSale` — safe when plugin is absent. */
+/** Drop-in replacement for `useFlashSale`. Safe when plugin absent (alias → stub). */
 export function useFlashSale(): UseFlashSaleReturn {
-    if (realHook) {
+    // When the plugin is absent, _useFlashSale is `undefined` (from stub).
+    if (typeof _useFlashSale === "function") {
         // eslint-disable-next-line react-hooks/rules-of-hooks
-        return realHook();
+        return (_useFlashSale as () => UseFlashSaleReturn)();
     }
     // eslint-disable-next-line react-hooks/rules-of-hooks
     return useNoopFlashSale();
 }
 
-/** Drop-in replacement for `applyFlashSale` — safe when plugin is absent. */
+/** Drop-in replacement for `applyFlashSale`. Safe when plugin absent. */
 export function applyFlashSale(
     originalPrice: number,
     campaign: FlashSaleCampaignFull | null | undefined
 ): FlashSaleResult {
-    if (realApply && campaign) return realApply(originalPrice, campaign);
-    return noopApply(originalPrice, campaign);
+    if (typeof _applyFlashSale === "function" && campaign) {
+        return _applyFlashSale(originalPrice, campaign);
+    }
+    return noopResolve(originalPrice);
 }

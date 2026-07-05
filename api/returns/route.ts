@@ -32,27 +32,8 @@ import {
 } from "@/plugin/product/models/Order";
 import PostInfo from "@/models/post_info";
 import mongoose from "mongoose";
-
-// ── Seller plugin — optional ──────────────────────────────────────────────────
-// Loaded with require() so webpack can handle a missing module gracefully.
-// When the seller plugin is not installed both values stay null and the
-// wallet-reversal block is silently skipped.
-let _getTransactionModel: (() => any) | null = null;
-let _updateWallet: ((userId: string, inc: Record<string, number>) => Promise<void>) | null = null;
-try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const txMod = require("@/plugin/seller/models/Transaction");
-    if (typeof txMod?.getTransactionModel === "function") {
-        _getTransactionModel = txMod.getTransactionModel;
-    }
-} catch { /* seller plugin not installed */ }
-try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const walletMod = require("@/plugin/seller/models/Wallet");
-    if (typeof walletMod?.updateWallet === "function") {
-        _updateWallet = walletMod.updateWallet;
-    }
-} catch { /* seller plugin not installed */ }
+import { getTransactionModel } from "@/plugin/seller/models/Transaction";
+import { updateWallet } from "@/plugin/seller/models/Wallet";
 
 export const dynamic = "force-dynamic";
 
@@ -317,9 +298,9 @@ export async function PUT(req: NextRequest): Promise<Response> {
             );
 
             // 2. Reverse seller wallet transactions for this order
-            //    Skipped silently when seller plugin is not installed.
-            const TxModel      = _getTransactionModel ? _getTransactionModel() : null;
-            const updateWalletFn = _updateWallet;
+            //    Skipped when seller plugin is not installed (stub returns undefined).
+            const TxModel      = typeof getTransactionModel === "function" ? getTransactionModel() : null;
+            const updateWalletFn = typeof updateWallet === "function" ? updateWallet : null;
 
             if (TxModel && updateWalletFn) {
                 const sellerTxs = await TxModel.find({
