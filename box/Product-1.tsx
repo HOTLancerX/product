@@ -1,62 +1,46 @@
 'use client';
 
 /**
- * Product Box 1 — Clean card style.
+ * plugin/product/box/Product-1.tsx
  *
- * Used as a reusable product card in listings, category pages, and search results.
- * Receives the same `data` shape as the full product page layouts.
+ * Clean product card — image top, info below.
  *
- * Displays:
- *   - Product image (first variant image → product images → placeholder)
- *   - Category badge (optional)
- *   - Title with link to the product page
- *   - Discount badge + regular/selling price (single mode)
- *     or "Variants available" label (variant mode)
- *   - Stock status
- *   - Add to Cart button (dispatches to localStorage cart via cms_cart_updated)
+ * Single mode:
+ *  - Discount badge, selling/regular price, stock indicator, Add to Cart
+ *  - Flash-sale price override when campaign is active
  *
- * Props:
- *   data              — post + info map (from the slug page or a listing query)
- *   productUrl        — full URL to the product page (built from permalink map)
- *   currencySymbol    — from product settings (default "$")
- *   flashSaleCampaign — optional; injected by the flash-sale plugin's page.
- *                       When present overrides price display. When absent the
- *                       useFlashSale hook handles dynamic fetch automatically.
- *
- * Flash-sale safety: if the flash-sale plugin is not installed the dynamic
- * import resolves to a no-op hook that returns original prices untouched.
+ * Variant mode:
+ *  - Price range displayed (e.g. $100 – $500)
+ *  - Color swatches below title (max 5 + overflow count)
+ *    Clicking a swatch swaps the preview image
+ *  - "Select Options" opens VariantPopup (portal, qty-aware)
  */
 
+import { useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { Icon } from '@iconify/react';
-// ── Flash Sale integration (lazy — does not break if plugin absent) ────────────
 import { useFlashSale, applyFlashSale } from './flashSaleOptional';
+import VariantPopup, { type VariantData } from './VariantPopup';
 
-// ── Types ─────────────────────────────────────────────────────────────────────
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 interface ProductBoxProps {
     data: {
-        _id: string;
-        title: string;
-        slug: string;
-        status: string;
+        _id:       string;
+        title:     string;
+        slug:      string;
+        status:    string;
         category?: string | null;
         createdAt?: string;
-        info: Record<string, string>;
+        info:      Record<string, string>;
     };
-    /** Full URL, e.g. /product/my-slug — built by parent from permalink map */
-    productUrl: string;
-    currencySymbol?: string;
-    /**
-     * Optional: pre-resolved flash-sale campaign (passed by FlashSalePage server
-     * component to avoid a redundant client fetch). When omitted the hook fetches
-     * active campaigns itself.
-     */
+    productUrl:        string;
+    currencySymbol?:   string;
     flashSaleCampaign?: import('./flashSaleOptional').FlashSaleCampaignFull | null;
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function parseJson<T>(raw: string | undefined, fallback: T): T {
     if (!raw) return fallback;
@@ -70,193 +54,292 @@ function fmtPrice(n: number): string {
     });
 }
 
-function addToCart(item: Record<string, unknown>) {
+function addToCartDirect(item: Record<string, unknown>) {
     try {
-        const raw  = localStorage.getItem('shopping_cart');
+        const raw    = localStorage.getItem('shopping_cart');
         const cart: any[] = raw ? JSON.parse(raw) : [];
-        const idx  = cart.findIndex(
+        const idx    = cart.findIndex(
             (c: any) => c.productId === item.productId && c.variantId === item.variantId
         );
         const maxQty = (item.maxQuantity as number) ?? 9999;
+        const addQty = Math.max(1, (item.quantity as number) || 1);
         if (idx >= 0) {
-            cart[idx].quantity = Math.min((cart[idx].quantity ?? 0) + 1, maxQty);
+            cart[idx].quantity = Math.min((cart[idx].quantity ?? 0) + addQty, maxQty);
         } else {
-            cart.push({ ...item, quantity: 1 });
+            cart.push({ ...item, quantity: Math.min(addQty, maxQty) });
         }
         localStorage.setItem('shopping_cart', JSON.stringify(cart));
         window.dispatchEvent(new Event('cartUpdated'));
     } catch { /* localStorage unavailable */ }
 }
 
-// ── Component ─────────────────────────────────────────────────────────────────
+// ─── Component ────────────────────────────────────────────────────────────────
 
-export default function ProductBox1({ data, productUrl, currencySymbol = '$', flashSaleCampaign }: ProductBoxProps) {
-    // ── Flash Sale hook ───────────────────────────────────────────────────────
-    // Provides a resolvePrice helper. When no campaign is active (or the plugin
-    // is not installed) it returns the original prices with applied=false.
+export default function ProductBox1({
+    data,
+    productUrl,
+    currencySymbol = '$',
+    flashSaleCampaign,
+}: ProductBoxProps) {
     const { resolvePrice } = useFlashSale();
 
-    const variate      = parseJson<Record<string, any>>(data.info?._variate, {});
-    const priceType    = (variate.priceType ?? 'single') as string;
-    const variants     = (variate.variants ?? []) as any[];
+    const variate   = parseJson<Record<string, any>>(data.info?._variate, {});
+    const priceType = (variate.priceType ?? 'single') as 'single' | 'variant';
+    const variants  = (variate.variants ?? []) as VariantData[];
+
+    // ── Single ────────────────────────────────────────────────────────────────
     const sellingPrice = parseFloat(variate.sellingprice ?? '0') || 0;
     const regularPrice = parseFloat(variate.regularprice ?? '0') || 0;
-    const stock        = parseInt(variate.stock ?? '0', 10) || 0;
+    const singleStock  = parseInt(variate.stock ?? '0', 10) || 0;
+    const basePrice    = sellingPrice > 0 ? sellingPrice : regularPrice;
 
-    // basePrice: always the effective selling price if set, else regular price.
-    // Flash-sale % is applied to this value — the product's regularPrice is
-    // never used as the calculation base when a campaign is active.
-    const basePrice = priceType === 'single'
-        ? (sellingPrice > 0 ? sellingPrice : regularPrice)
-        : 0;
-    const inStock = priceType === 'single'
-        ? stock > 0
-        : variants.some((v: any) => parseInt(v.quantity || '0') > 0);
-
-    // Resolve flash-sale pricing
-    // If flashSaleCampaign is provided directly (from FlashSalePage), use it;
-    // otherwise let the hook compute it from the fetched campaigns.
     const flashResult = flashSaleCampaign
         ? applyFlashSale(basePrice, flashSaleCampaign)
         : resolvePrice(basePrice, String(data._id), data.category ?? null);
 
-    // ── Display price logic ───────────────────────────────────────────────────
-    // When a flash-sale is active: use only campaign-computed prices.
-    // When no flash-sale: fall back to the product's own discount display
-    //   (show regularPrice crossed-out if sellingPrice < regularPrice).
-    const hasFlash = flashResult.applied;
-
-    // Product-level discount (only shown when no flash-sale overrides it)
-    const productHasDiscount = !hasFlash
-        && priceType === 'single'
-        && sellingPrice > 0
-        && regularPrice > sellingPrice;
-
-    const displayRegular  = hasFlash
-        ? flashResult.regularPrice          // campaign "was" price
-        : (productHasDiscount ? regularPrice : basePrice);
-    const displaySelling  = hasFlash
-        ? flashResult.sellingPrice          // campaign "now" price
-        : basePrice;
-    const discountPercent = hasFlash
+    const hasFlash          = flashResult.applied;
+    const productHasDisc    = !hasFlash && sellingPrice > 0 && regularPrice > sellingPrice;
+    const displayRegular    = hasFlash ? flashResult.regularPrice : (productHasDisc ? regularPrice : basePrice);
+    const displaySelling    = hasFlash ? flashResult.sellingPrice : basePrice;
+    const discountPercent   = hasFlash
         ? flashResult.discountPercent
-        : (productHasDiscount
-            ? Math.round(((regularPrice - sellingPrice) / regularPrice) * 100)
-            : 0);
-    const currentPrice = priceType === 'single' ? displaySelling : 0;
-    const showStrike   = hasFlash || productHasDiscount;
+        : (productHasDisc ? Math.round(((regularPrice - sellingPrice) / regularPrice) * 100) : 0);
+    const currentPrice      = priceType === 'single' ? displaySelling : 0;
+    const showStrike        = hasFlash || productHasDisc;
 
-    // First available image
+    // ── Variant ───────────────────────────────────────────────────────────────
+    const variantPrices = variants.map((v) => parseFloat(v.price ?? '0') || 0).filter((p) => p > 0);
+    const minVarPrice   = variantPrices.length ? Math.min(...variantPrices) : 0;
+    const maxVarPrice   = variantPrices.length ? Math.max(...variantPrices) : 0;
+    const variantStock  = variants.reduce((s, v) => s + (parseInt(v.quantity ?? '0', 10) || 0), 0);
+
+    const selectedAttributes: { label: string; values: string[]; displayStyle?: string }[] =
+        variate.selectedAttributes ?? [];
+
+    const colorAttr =
+        selectedAttributes.find((a) => (a.displayStyle ?? '').includes('color')) ??
+        selectedAttributes.find((a) => variants.some((v) => v.options[a.label] && v.color));
+
+    type Swatch = { value: string; hex: string; image: string };
+    const swatches: Swatch[] = [];
+    if (colorAttr) {
+        const seen = new Set<string>();
+        for (const val of colorAttr.values) {
+            if (seen.has(val)) continue;
+            seen.add(val);
+            const m = variants.find((v) => v.options[colorAttr.label] === val);
+            swatches.push({ value: val, hex: m?.color ?? '', image: m?.image ?? '' });
+        }
+    }
+
+    // ── State ─────────────────────────────────────────────────────────────────
+    const [activeSwatch, setActiveSwatch] = useState<string | null>(swatches[0]?.value ?? null);
+    const [showPopup, setShowPopup]       = useState(false);
+
+    // Resolve display image
     let img = '';
-    for (const v of variants) {
-        if (v.image) { img = v.image; break; }
+    if (priceType === 'variant' && activeSwatch && colorAttr) {
+        img = variants.find((v) => v.options[colorAttr.label] === activeSwatch)?.image ?? '';
     }
-    if (!img) {
-        const imgs = parseJson<string[]>(data.info?.images, []);
-        img = imgs[0] ?? '';
-    }
+    if (!img) { for (const v of variants) { if (v.image) { img = v.image; break; } } }
+    if (!img) { img = parseJson<string[]>(data.info?.images, [])[0] ?? ''; }
 
-    const firstVariant = variants[0];
+    const inStock = priceType === 'single' ? singleStock > 0 : variantStock > 0;
 
-    const handleAddToCart = (e: React.MouseEvent) => {
+    // ── Cart handlers ─────────────────────────────────────────────────────────
+    const handleSingleCart = (e: React.MouseEvent) => {
         e.preventDefault();
         if (!inStock) return;
-        addToCart({
-            productId:      String(data._id),
-            productSlug:    data.slug,
-            productTitle:   data.title,
-            productImage:   img,
-            variantId:      firstVariant?.id,
-            variantOptions: firstVariant?.options,
-            sku:            firstVariant?.sku,
-            price:          currentPrice || parseFloat(firstVariant?.price || '0') || 0,
-            maxQuantity:    stock || parseInt(firstVariant?.quantity || '0', 10) || 9999,
-            shippingInside: parseFloat(data.info?.shipping_inside ?? '') || undefined,
+        addToCartDirect({
+            productId:       String(data._id),
+            productSlug:     data.slug,
+            productTitle:    data.title,
+            productImage:    img,
+            price:           currentPrice,
+            maxQuantity:     singleStock,
+            shippingInside:  parseFloat(data.info?.shipping_inside ?? '') || undefined,
             shippingOutside: parseFloat(data.info?.shipping_outside ?? '') || undefined,
         });
     };
 
+    const handleVariantCart = (variant: VariantData, qty: number) => {
+        addToCartDirect({
+            productId:       String(data._id),
+            productSlug:     data.slug,
+            productTitle:    data.title,
+            productImage:    variant.image || img,
+            variantId:       variant.id,
+            variantOptions:  variant.options,
+            sku:             variant.sku,
+            price:           parseFloat(variant.price ?? '0') || 0,
+            maxQuantity:     parseInt(variant.quantity ?? '0', 10) || 9999,
+            quantity:        qty,
+            shippingInside:  parseFloat(data.info?.shipping_inside ?? '') || undefined,
+            shippingOutside: parseFloat(data.info?.shipping_outside ?? '') || undefined,
+        });
+    };
+
+    const MAX_SW      = 5;
+    const visibleSw   = swatches.slice(0, MAX_SW);
+    const extraSw     = swatches.length - MAX_SW;
+
     return (
-        <div className="group relative bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow overflow-hidden flex flex-col">
-            {/* Discount badge */}
-            {discountPercent > 0 && (
-                <span className={`absolute top-3 left-3 z-10 text-white text-xs font-bold px-2 py-0.5 rounded-full ${hasFlash ? 'bg-rose-500' : 'bg-red-500'}`}>
-                    -{discountPercent}%
-                </span>
-            )}
-            {/* Flash sale tag icon */}
-            {hasFlash && (
-                <span className="absolute top-3 right-3 z-10">
-                    <Icon icon="solar:tag-price-bold" width={16} className="text-rose-500" />
-                </span>
-            )}
+        <>
+            <div className="group relative bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow overflow-hidden flex flex-col">
 
-            {/* Image */}
-            <Link href={productUrl} className="block aspect-square overflow-hidden bg-gray-50">
-                {img ? (
-                    <Image
-                        src={img}
-                        alt={data.title}
-                        width={400}
-                        height={400}
-                        className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300"
-                    />
-                ) : (
-                    <div className="w-full h-full flex items-center justify-center text-gray-200">
-                        <Icon icon="mdi:image-off" width="48" height="48" />
-                    </div>
+                {/* Badges */}
+                {discountPercent > 0 && (
+                    <span className={`absolute top-3 left-3 z-10 text-white text-xs font-bold px-2 py-0.5 rounded-full shadow ${hasFlash ? 'bg-rose-500' : 'bg-red-500'}`}>
+                        -{discountPercent}%
+                    </span>
                 )}
-            </Link>
+                {hasFlash && (
+                    <span className="absolute top-3 right-3 z-10">
+                        <Icon icon="solar:tag-price-bold" width={16} className="text-rose-500" />
+                    </span>
+                )}
+                {!inStock && (
+                    <span className="absolute top-3 right-3 z-10 bg-gray-600/80 text-white text-[10px] font-semibold px-2 py-0.5 rounded-full">
+                        Sold Out
+                    </span>
+                )}
 
-            {/* Info */}
-            <div className="flex flex-col flex-1 p-3 gap-2">
-                {/* Title */}
-                <Link href={productUrl}
-                    className="text-sm font-semibold text-gray-900 hover:text-main transition-colors line-clamp-2 leading-snug">
-                    {data.title}
+                {/* Image */}
+                <Link href={productUrl} className="block aspect-square overflow-hidden bg-gray-50" tabIndex={-1}>
+                    {img ? (
+                        <Image
+                            src={img}
+                            alt={data.title}
+                            width={400}
+                            height={400}
+                            className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300"
+                        />
+                    ) : (
+                        <div className="w-full h-full flex items-center justify-center text-gray-200">
+                            <Icon icon="mdi:image-off" width={48} />
+                        </div>
+                    )}
                 </Link>
 
-                {/* Price */}
-                <div className="flex items-center gap-2 flex-wrap mt-auto">
-                    {priceType === 'single' && currentPrice > 0 ? (
-                        <>
-                            {showStrike && (
-                                <span className="text-xs text-gray-400 line-through">
-                                    {currencySymbol} {fmtPrice(displayRegular)}
+                {/* Body */}
+                <div className="flex flex-col flex-1 p-3 gap-2">
+
+                    {/* Title */}
+                    <Link
+                        href={productUrl}
+                        className="text-sm font-semibold text-gray-900 hover:text-main transition-colors line-clamp-2 leading-snug"
+                    >
+                        {data.title}
+                    </Link>
+
+                    {/* Price */}
+                    <div className="flex items-center gap-2 flex-wrap mt-auto">
+                        {priceType === 'single' ? (
+                            currentPrice > 0 && (
+                                <>
+                                    {showStrike && (
+                                        <span className="text-xs text-gray-400 line-through">
+                                            {currencySymbol} {fmtPrice(displayRegular)}
+                                        </span>
+                                    )}
+                                    <span className={`text-base font-bold ${hasFlash ? 'text-rose-600' : 'text-main'}`}>
+                                        {currencySymbol} {fmtPrice(currentPrice)}
+                                    </span>
+                                </>
+                            )
+                        ) : (
+                            minVarPrice > 0 ? (
+                                <span className="text-base font-bold text-main">
+                                    {minVarPrice === maxVarPrice
+                                        ? `${currencySymbol} ${fmtPrice(minVarPrice)}`
+                                        : `${currencySymbol} ${fmtPrice(minVarPrice)} – ${currencySymbol} ${fmtPrice(maxVarPrice)}`
+                                    }
                                 </span>
+                            ) : (
+                                <span className="text-xs text-gray-400 italic">See options</span>
+                            )
+                        )}
+                    </div>
+
+                    {/* Color swatches (variant) */}
+                    {priceType === 'variant' && visibleSw.length > 0 && (
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                            {visibleSw.map((sw) => (
+                                sw.hex ? (
+                                    <button
+                                        key={sw.value}
+                                        type="button"
+                                        title={sw.value}
+                                        onClick={(e) => { e.preventDefault(); setActiveSwatch(sw.value); }}
+                                        className={`w-5 h-5 rounded-full border-2 shrink-0 transition-all ${
+                                            activeSwatch === sw.value
+                                                ? 'border-main scale-110 ring-1 ring-main/40'
+                                                : 'border-white shadow-sm hover:scale-105 hover:border-main/50'
+                                        }`}
+                                        style={{ backgroundColor: sw.hex }}
+                                    />
+                                ) : (
+                                    <button
+                                        key={sw.value}
+                                        type="button"
+                                        onClick={(e) => { e.preventDefault(); setActiveSwatch(sw.value); }}
+                                        className={`px-1.5 py-0.5 rounded text-[10px] font-medium border transition-all ${
+                                            activeSwatch === sw.value
+                                                ? 'bg-main text-white border-main'
+                                                : 'bg-gray-50 text-gray-600 border-gray-200 hover:border-main'
+                                        }`}
+                                    >
+                                        {sw.value}
+                                    </button>
+                                )
+                            ))}
+                            {extraSw > 0 && (
+                                <span className="text-[10px] text-gray-400">+{extraSw}</span>
                             )}
-                            <span className={`text-base font-bold ${hasFlash ? 'text-rose-600' : 'text-main'}`}>
-                                {currencySymbol} {fmtPrice(currentPrice)}
-                            </span>
-                        </>
-                    ) : priceType === 'variant' && variants.length > 0 ? (
-                        <span className="text-xs text-gray-500 italic">
-                            {variants.length} variant{variants.length !== 1 ? 's' : ''} available
+                        </div>
+                    )}
+
+                    {/* Stock indicator (single only) */}
+                    {priceType === 'single' && (
+                        <span className={`text-xs flex items-center gap-1 ${inStock ? 'text-green-600' : 'text-red-400'}`}>
+                            <Icon icon={inStock ? 'mdi:check-circle' : 'mdi:close-circle'} width={13} />
+                            {inStock ? 'In stock' : 'Out of stock'}
                         </span>
-                    ) : null}
+                    )}
+
+                    {/* CTA */}
+                    <button
+                        type="button"
+                        onClick={priceType === 'variant'
+                            ? (e) => { e.preventDefault(); if (inStock) setShowPopup(true); }
+                            : handleSingleCart
+                        }
+                        disabled={!inStock}
+                        className="w-full mt-1 py-2 rounded-xl bg-main text-white text-sm font-bold hover:opacity-90 disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-1.5 shadow-sm shadow-main/20 active:scale-[0.98]"
+                    >
+                        <Icon icon="mdi:cart-plus" width={16} />
+                        {inStock
+                            ? (priceType === 'variant' ? 'Select Options' : 'Add to Cart')
+                            : 'Out of Stock'
+                        }
+                    </button>
                 </div>
-
-                {/* Stock */}
-                {inStock ? (
-                    <span className="text-xs text-green-600 flex items-center gap-1">
-                        <Icon icon="mdi:check-circle" width="13" height="13" />
-                        In stock
-                    </span>
-                ) : (
-                    <span className="text-xs text-red-400">Out of stock</span>
-                )}
-
-                {/* Add to Cart */}
-                <button
-                    type="button"
-                    onClick={handleAddToCart}
-                    disabled={!inStock}
-                    className="w-full mt-1 py-2 rounded-lg bg-main text-white text-sm font-semibold hover:bg-main/80 disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-1.5"
-                >
-                    <Icon icon="mdi:cart-plus" width="16" height="16" />
-                    {inStock ? 'Add to Cart' : 'Out of Stock'}
-                </button>
             </div>
-        </div>
+
+            {/* Variant popup */}
+            {showPopup && priceType === 'variant' && (
+                <VariantPopup
+                    productId={String(data._id)}
+                    productSlug={data.slug}
+                    productTitle={data.title}
+                    productImage={img}
+                    variants={variants}
+                    selectedAttributes={selectedAttributes}
+                    currencySymbol={currencySymbol}
+                    onClose={() => setShowPopup(false)}
+                    onAddToCart={handleVariantCart}
+                />
+            )}
+        </>
     );
 }
