@@ -18,11 +18,7 @@ import Slider from './Slider';
 import Variant from './Variant';
 import Specification from './Specification';
 import { useFlashSaleOptional } from './useFlashSaleOptional';
-import { resolveLazyComponent } from '@/hook/pluginHooks';
-
-// ── Compare: loaded lazily only when compare plugin is active ────────────────
-// resolveLazyComponent returns null when plugin is inactive/absent — the
-// CompareSection renders nothing in that case. No direct cross-plugin import.
+import { getCompareComponent } from './compareOptional';
 import type { ComponentType } from 'react';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -441,9 +437,9 @@ function CompareSection({ currentId, currentSlug, compareIds, currencySymbol }: 
     const fetchedRef = useRef(false);
     const [CompareComponent, setCompareComponent] = useState<ComponentType<any> | null>(null);
 
-    // Resolve the Compare component lazily — only when compare plugin is active.
+    // Resolve the Compare component — only available when compare plugin is active.
     useEffect(() => {
-        resolveLazyComponent('compare.Compare').then((c) => setCompareComponent(() => c));
+        setCompareComponent(() => getCompareComponent());
     }, []);
 
     useEffect(() => {
