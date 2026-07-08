@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getOrdersCollection, initializeOrdersCollection } from '@/plugin/product/models/Order';
 import { resolveUser } from '@/lib/session';
+import { doAction } from '@/hook/pluginHooks';
 
 export const dynamic = 'force-dynamic';
 
@@ -130,16 +131,22 @@ export async function PUT(
             { $set, $push: { timeline: timelineEntry } } as any
         );
 
-        // ── Commission credit + membership activation on delivery ──
-        // Only trigger once — when transitioning INTO "delivered" from a non-delivered status.
+        // ── Fire action hooks on delivery ─────────────────────────────────
+        // When an order transitions to "delivered", broadcast the event so any
+        // active plugin can respond (seller commission credit, membership
+        // activation, loyalty points, etc.) — zero direct imports needed.
         const transitioningToDelivered =
             status === 'delivered' && order.status !== 'delivered';
 
         if (transitioningToDelivered) {
-            await createSellerCommissionCredits(order, orderNumber, now);
-            await activateMembershipOnDelivery(order).catch((err) =>
-                console.error('membership activation error:', err)
-            );
+            await doAction('order.delivered', {
+                order,
+                orderNumber,
+                orderId:   String(order._id),
+                userId:    order.userId ?? '',
+                items:     order.items  ?? [],
+                now,
+            });
         }
 
         const updated = await collection.findOne({ orderNumber });
@@ -147,162 +154,5 @@ export async function PUT(
     } catch (error) {
         console.error('Order PUT error:', error);
         return NextResponse.json({ error: 'Failed to update order' }, { status: 500 });
-    }
-}
-
-// ── Commission credit helper ──────────────────────────────────────────────────
-
-/**
- * For each item in the order that has an uploadedBy seller:
- *  1. Look up the product category's seller_commission rate.
- *  2. Calculate net seller amount = subtotal × (1 - rate/100).
- *  3. Create a SellerTransaction (type: credit, status: pending).
- *  4. Increment the seller's pendingBalance and totalEarned.
- *
- * Idempotent: skips items that already have a pending/available credit for this order.
- */
-async function createSellerCommissionCredits(
-    order: any,
-    orderNumber: string,
-    now: Date
-): Promise<void> {
-    try {
-        // Lazy imports — keep this route tree free of Mongoose at module level
-        const { default: connectDB }                = await import('@/lib/mongodb');
-        const { getTransactionModel }               = await import('@/plugin/seller/models/Transaction');
-        const { updateWallet }                      = await import('@/plugin/seller/models/Wallet');
-        const { default: PostInfo }                 = await import('@/models/post_info');
-
-        await connectDB();
-
-        const TxModel = getTransactionModel();
-        const availableAfter = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
-
-        // Group items by seller (uploadedBy)
-        const bySellerMap = new Map<string, typeof order.items>();
-        for (const item of order.items) {
-            if (!item.uploadedBy) continue;
-            const arr = bySellerMap.get(item.uploadedBy) ?? [];
-            arr.push(item);
-            bySellerMap.set(item.uploadedBy, arr);
-        }
-
-        for (const [sellerId, items] of bySellerMap) {
-            // Check if a credit for this seller+order already exists (idempotency)
-            const existing = await TxModel.findOne({
-                userId:      sellerId,
-                orderNumber,
-                type:        'credit',
-                status:      { $in: ['pending', 'available'] },
-            }).lean();
-            if (existing) continue;
-
-            // Calculate total subtotal and commission for this seller's items
-            let gross = 0;
-            let commissionRate = 0;
-
-            for (const item of items) {
-                gross += item.subtotal ?? 0;
-
-                // Fetch commission rate from product's category (first item wins for simplicity)
-                if (commissionRate === 0 && item.productId) {
-                    try {
-                        // Look up the product's category id from PostInfo
-                        const catInfo = await PostInfo.findOne({
-                            postId: item.productId,
-                            name:   'category',
-                        }).lean() as any;
-
-                        if (catInfo?.value) {
-                            // Look up the seller_commission for this category
-                            const { getCollection } = await import('@/lib/mongodb');
-                            const catInfoCol = await getCollection('cat_infos');
-                            const commInfo = await catInfoCol.findOne({
-                                catId: catInfo.value,
-                                name:  'seller_commission',
-                            });
-                            const rate = parseFloat((commInfo as any)?.value ?? '0');
-                            if (!isNaN(rate) && rate > 0) commissionRate = rate;
-                        }
-                    } catch {
-                        // commission stays 0 if lookup fails
-                    }
-                }
-            }
-
-            const adminAmount  = parseFloat(((gross * commissionRate) / 100).toFixed(2));
-            const sellerAmount = parseFloat((gross - adminAmount).toFixed(2));
-
-            // Create the pending credit transaction
-            await TxModel.create({
-                userId:         sellerId,
-                orderId:        String(order._id),
-                orderNumber,
-                type:           'credit',
-                status:         'pending',
-                gross,
-                commissionRate,
-                adminAmount,
-                amount:         sellerAmount,
-                availableAfter,
-                note:           `Earnings from order ${orderNumber}. Available after ${availableAfter.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}.`,
-            });
-
-            // Add to pendingBalance and totalEarned
-            await updateWallet(sellerId, {
-                pendingBalance: sellerAmount,
-                totalEarned:    sellerAmount,
-            });
-        }
-    } catch (err) {
-        // Log but do not fail the status update
-        console.error('createSellerCommissionCredits error:', err);
-    }
-}
-// ── Membership activation on delivery ─────────────────────────────────────────
-
-/**
- * When an order is delivered, check if any item matches a membership package's
- * linked productId. If so, activate/renew the buyer's seller membership.
- */
-async function activateMembershipOnDelivery(order: any): Promise<void> {
-    try {
-        // Dynamic requires bypass static type-checking so the product plugin
-        // compiles cleanly whether or not seller-membership is installed.
-        // eslint-disable-next-line @typescript-eslint/no-require-imports
-        const pkgMod = require('@/plugin/seller-membership/models/MembershipPackage') as
-            { getActivePackages: () => Promise<any[]> };
-        // eslint-disable-next-line @typescript-eslint/no-require-imports
-        const memMod = require('@/plugin/seller-membership/models/SellerMembership') as
-            { activateMembership: (userId: string, packageId: string, orderNumber: string, quantity: number, type: 'one-time' | 'monthly' | 'yearly') => Promise<void> };
-
-        const { getActivePackages } = pkgMod;
-        const { activateMembership } = memMod;
-
-        const packages = await getActivePackages();
-        if (!packages.length) return;
-
-        const buyerUserId = order.userId;
-        if (!buyerUserId) return;
-
-        for (const item of (order.items ?? [])) {
-            const matchedPkg = packages.find((p: any) => p.productId === item.productId);
-            if (!matchedPkg) continue;
-
-            const quantity = item.quantity ?? 1;
-            await activateMembership(
-                buyerUserId,
-                matchedPkg._id,
-                order.orderNumber || '',
-                quantity,
-                matchedPkg.type as 'one-time' | 'monthly' | 'yearly'
-            );
-
-            console.log(
-                `[seller-membership] Activated ${matchedPkg.name} for user ${buyerUserId} (qty: ${quantity}, order: ${order.orderNumber})`
-            );
-        }
-    } catch (err) {
-        console.error('[seller-membership] activateMembershipOnDelivery error:', err);
     }
 }

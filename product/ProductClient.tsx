@@ -18,9 +18,12 @@ import Slider from './Slider';
 import Variant from './Variant';
 import Specification from './Specification';
 import { useFlashSaleOptional } from './useFlashSaleOptional';
-import dynamic from 'next/dynamic';
+import { resolveLazyComponent } from '@/hook/pluginHooks';
 
-const Compare = dynamic(() => import('@/plugin/compare/ui/Compare'), { ssr: false });
+// ── Compare: loaded lazily only when compare plugin is active ────────────────
+// resolveLazyComponent returns null when plugin is inactive/absent — the
+// CompareSection renders nothing in that case. No direct cross-plugin import.
+import type { ComponentType } from 'react';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -436,6 +439,12 @@ function CompareSection({ currentId, currentSlug, compareIds, currencySymbol }: 
     } | null>(null);
     const [loading, setLoading] = useState(false);
     const fetchedRef = useRef(false);
+    const [CompareComponent, setCompareComponent] = useState<ComponentType<any> | null>(null);
+
+    // Resolve the Compare component lazily — only when compare plugin is active.
+    useEffect(() => {
+        resolveLazyComponent('compare.Compare').then((c) => setCompareComponent(() => c));
+    }, []);
 
     useEffect(() => {
         const el = sentinelRef.current;
@@ -454,6 +463,9 @@ function CompareSection({ currentId, currentSlug, compareIds, currencySymbol }: 
         return () => observer.disconnect();
     }, [compareIds, currentId]);
 
+    // If compare plugin is not active, render nothing
+    if (!CompareComponent) return null;
+
     return (
         <div ref={sentinelRef}>
             {loading && (
@@ -463,7 +475,7 @@ function CompareSection({ currentId, currentSlug, compareIds, currencySymbol }: 
                 </div>
             )}
             {compareData && (
-                <Compare
+                <CompareComponent
                     current={compareData.current}
                     compareProducts={compareData.compareProducts}
                     categoryProducts={compareData.categoryProducts}

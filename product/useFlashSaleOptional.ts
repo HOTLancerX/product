@@ -4,49 +4,18 @@
  * plugin/product/product/useFlashSaleOptional.ts
  *
  * Re-exports useFlashSale for ProductClient.
- * When the flash-sale plugin is absent, next.config.ts aliases the module to
- * lib/optional-plugin-stub.ts (exports undefined). The null-check here handles
- * that so ProductClient always gets a valid resolvePrice function.
+ * When the flash-sale plugin is inactive or not installed, returns a noop resolver.
+ * No direct imports from the flash-sale plugin — uses the registry from flashSaleOptional.ts instead.
  */
 
-import _useFlashSale from "@/plugin/flash-sale/lib/useFlashSale";
-import { useState } from "react";
+import { useFlashSale, type UseFlashSaleReturn } from "../box/flashSaleOptional";
 
-export interface FlashSaleResult {
-    applied:          boolean;
-    regularPrice:     number;
-    sellingPrice:     number;
-    discountPercent:  number;
-    campaign:         any | null;
-}
+export type { FlashSaleResult, UseFlashSaleReturn, FlashSaleCampaignFull } from "../box/flashSaleOptional";
 
-export interface UseFlashSaleReturn {
-    ready:        boolean;
-    resolvePrice: (
-        originalPrice: number,
-        productId:     string,
-        categoryId?:   string | null
-    ) => FlashSaleResult;
-}
-
-function noopResolve(originalPrice: number): FlashSaleResult {
-    return {
-        applied: false, regularPrice: originalPrice,
-        sellingPrice: originalPrice, discountPercent: 0, campaign: null,
-    };
-}
-
-function useNoopFlashSale(): UseFlashSaleReturn {
-    // eslint-disable-next-line react-hooks/rules-of-hooks
-    useState(false); // keep hook call count stable
-    return { ready: true, resolvePrice: noopResolve };
-}
-
+/**
+ * Drop-in replacement for useFlashSale.
+ * Safe to call whether or not the flash-sale plugin is active.
+ */
 export function useFlashSaleOptional(): UseFlashSaleReturn {
-    if (typeof _useFlashSale === "function") {
-        // eslint-disable-next-line react-hooks/rules-of-hooks
-        return (_useFlashSale as () => UseFlashSaleReturn)();
-    }
-    // eslint-disable-next-line react-hooks/rules-of-hooks
-    return useNoopFlashSale();
+    return useFlashSale();
 }

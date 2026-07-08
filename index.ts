@@ -1,5 +1,17 @@
 import { addHook, addPostType, addCatType, type PluginMeta } from "@/hook";
-import { Text, Textarea, Select, Switch, Tags, CategoryHierarchicalSelect } from "@/components/ui";
+import { Text, Textarea, Select, Switch, CategoryHierarchicalSelect } from "@/components/ui";
+import { registerLazyComponent } from "@/hook/pluginHooks";
+
+// ─── Lazy component registrations ─────────────────────────────────────────────
+// Heavy page components are NOT imported at module load time.
+// They are dynamically imported on-demand when the plugin is active.
+// This keeps them out of the bundle when the plugin is disabled.
+//
+// Components used directly in addHook() calls (pass as `component:`) are still
+// imported statically here because they are lightweight UI field components
+// that must be synchronously available during hook registration.
+// Only page-level / route-level components use lazy loading.
+
 import ProductLayout1 from "./product/Layout1";
 import ProductLayout2 from "./product/Layout2";
 import ProductCategoryLayout1 from "./product-category/Layout1";
@@ -10,22 +22,6 @@ import ProductSettingsPage from "./settings/ProductSettingsPage";
 import ProductBox1 from "./box/Product-1";
 import ProductBox2 from "./box/Product-2";
 import Header4 from "./header/Header1";
-import CheckoutPage from "./checkout/page";
-import OrderConfirmationPage from "./order-confirmation/page";
-import AdminOrdersPage      from "./orders/page";
-import AdminOrderDetailPage  from "./orders/details";
-import PendingOrdersPage     from "./orders/pending/page";
-import ProcessingOrdersPage  from "./orders/processing/page";
-import ShippedOrdersPage     from "./orders/shipped/page";
-import DeliveredOrdersPage   from "./orders/delivered/page";
-import CancelledOrdersPage   from "./orders/cancelled/page";
-import ReturnManager         from "./orders/ReturnManager";
-import UserOrderList         from "./users/orderlist";
-import UserOrderDetails      from "./users/orderdetails";
-// NOTE: lib/category.ts is NOT imported here — it imports Mongoose models
-// and would pollute the client bundle via the plugin registry chain.
-// Instead, we register a lazy wrapper below that only resolves the import
-// at call time (server-side only, inside an async function).
 
 // ─── Plugin metadata ───────────────────────────────────────────────────────────
 export const PLUGINS: PluginMeta = {
@@ -44,6 +40,21 @@ export const PLUGINS: PluginMeta = {
  * Called by PluginList.reregisterHooks() after the gate is armed.
  */
 export function register() {
+    // ─── Register lazy page components ───────────────────────────────────────
+    // These are registered once per register() call (dedup is inside
+    // registerLazyComponent — last write wins on re-register / hot-reload).
+    registerLazyComponent("product.CheckoutPage",          () => import("./checkout/page"),           PLUGINS.nx);
+    registerLazyComponent("product.OrderConfirmationPage", () => import("./order-confirmation/page"), PLUGINS.nx);
+    registerLazyComponent("product.AdminOrdersPage",       () => import("./orders/page"),             PLUGINS.nx);
+    registerLazyComponent("product.AdminOrderDetailPage",  () => import("./orders/details"),          PLUGINS.nx);
+    registerLazyComponent("product.PendingOrdersPage",     () => import("./orders/pending/page"),     PLUGINS.nx);
+    registerLazyComponent("product.ProcessingOrdersPage",  () => import("./orders/processing/page"),  PLUGINS.nx);
+    registerLazyComponent("product.ShippedOrdersPage",     () => import("./orders/shipped/page"),     PLUGINS.nx);
+    registerLazyComponent("product.DeliveredOrdersPage",   () => import("./orders/delivered/page"),   PLUGINS.nx);
+    registerLazyComponent("product.CancelledOrdersPage",   () => import("./orders/cancelled/page"),   PLUGINS.nx);
+    registerLazyComponent("product.ReturnManager",         () => import("./orders/ReturnManager"),    PLUGINS.nx);
+    registerLazyComponent("product.UserOrderList",         () => import("./users/orderlist"),         PLUGINS.nx);
+    registerLazyComponent("product.UserOrderDetails",      () => import("./users/orderdetails"),      PLUGINS.nx);
     // ─── Register post & category types ────────────────────────────────────
     addPostType([
         {
@@ -480,7 +491,7 @@ export function register() {
             type: "product-orders",
             style: "left",
             position: 10,
-            path: AdminOrdersPage,
+            lazyPath: "product.AdminOrdersPage",
         },
         {
             key: "orders/",
@@ -488,7 +499,7 @@ export function register() {
             type: "product-orders",
             style: "left",
             position: 11,
-            path: AdminOrderDetailPage,
+            lazyPath: "product.AdminOrderDetailPage",
         },
         {
             key: "orders/pending",
@@ -496,7 +507,7 @@ export function register() {
             type: "product-orders",
             style: "left",
             position: 12,
-            path: PendingOrdersPage,
+            lazyPath: "product.PendingOrdersPage",
         },
         {
             key: "orders/processing",
@@ -504,7 +515,7 @@ export function register() {
             type: "product-orders",
             style: "left",
             position: 13,
-            path: ProcessingOrdersPage,
+            lazyPath: "product.ProcessingOrdersPage",
         },
         {
             key: "orders/shipped",
@@ -512,7 +523,7 @@ export function register() {
             type: "product-orders",
             style: "left",
             position: 14,
-            path: ShippedOrdersPage,
+            lazyPath: "product.ShippedOrdersPage",
         },
         {
             key: "orders/delivered",
@@ -520,7 +531,7 @@ export function register() {
             type: "product-orders",
             style: "left",
             position: 15,
-            path: DeliveredOrdersPage,
+            lazyPath: "product.DeliveredOrdersPage",
         },
         {
             key: "orders/cancelled",
@@ -528,7 +539,7 @@ export function register() {
             type: "product-orders",
             style: "left",
             position: 16,
-            path: CancelledOrdersPage,
+            lazyPath: "product.CancelledOrdersPage",
         },
         {
             key: "orders/returns",
@@ -536,7 +547,7 @@ export function register() {
             type: "product-orders",
             style: "left",
             position: 17,
-            path: ReturnManager,
+            lazyPath: "product.ReturnManager",
         },
         {
             key: "product/settings",
@@ -696,7 +707,7 @@ export function register() {
             style: "left",
             position: 10,
             active: true,
-            component: CheckoutPage,
+            lazyPath: "product.CheckoutPage",
         },
         {
             key: "order-confirmation",
@@ -706,7 +717,7 @@ export function register() {
             style: "left",
             position: 11,
             active: true,
-            component: OrderConfirmationPage,
+            lazyPath: "product.OrderConfirmationPage",
         },
     ], PLUGINS.nx);
 
@@ -732,7 +743,7 @@ export function register() {
             type:     "user-orders",
             style:    "left",
             position: 10,
-            path:     UserOrderList,
+            lazyPath: "product.UserOrderList",
         },
         {
             key:      "orders/",
@@ -740,7 +751,7 @@ export function register() {
             type:     "user-orders",
             style:    "left",
             position: 11,
-            path:     UserOrderDetails,
+            lazyPath: "product.UserOrderDetails",
         },
     ], PLUGINS.nx);
 }

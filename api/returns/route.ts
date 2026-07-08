@@ -13,10 +13,16 @@
  *   body: { id, action: "approve" | "reject", note? }
  *   "approve" → status: "approved"
  *     - cancels the order
- *     - reverses seller's pending/available balance for the order
+ *     - fires the "return.approved" action hook so the seller plugin (if active)
+ *       can reverse wallet balances — no direct import needed
  *     - sets payment status to "refunded"
  *     - sets refundProcessed: true
  *   "reject" → status: "rejected_admin"
+ *
+ * Cross-plugin integration:
+ *   Wallet reversal is handled by the seller plugin via the "return.approved"
+ *   action hook (addAction in seller/index.ts). This file has ZERO direct
+ *   imports from the seller plugin.
  */
 
 import { NextRequest, NextResponse } from "next/server";
@@ -32,8 +38,7 @@ import {
 } from "@/plugin/product/models/Order";
 import PostInfo from "@/models/post_info";
 import mongoose from "mongoose";
-import { getTransactionModel } from "@/plugin/seller/models/Transaction";
-import { updateWallet } from "@/plugin/seller/models/Wallet";
+import { doAction } from "@/hook/pluginHooks";
 
 export const dynamic = "force-dynamic";
 
@@ -297,49 +302,13 @@ export async function PUT(req: NextRequest): Promise<Response> {
                 }
             );
 
-            // 2. Reverse seller wallet transactions for this order
-            //    Skipped when seller plugin is not installed (stub returns undefined).
-            const TxModel      = typeof getTransactionModel === "function" ? getTransactionModel() : null;
-            const updateWalletFn = typeof updateWallet === "function" ? updateWallet : null;
-
-            if (TxModel && updateWalletFn) {
-                const sellerTxs = await TxModel.find({
-                    orderNumber: returnReq.orderNumber,
-                    type:        "credit",
-                    status:      { $in: ["pending", "available"] },
-                }).lean() as any[];
-
-                for (const tx of sellerTxs) {
-                    if (tx.status === "pending") {
-                        await TxModel.updateOne(
-                            { _id: tx._id },
-                            { $set: { status: "cancelled", note: `Reversed: return approved for order ${returnReq.orderNumber}` } }
-                        );
-                        await updateWalletFn(tx.userId, { pendingBalance: -tx.amount });
-                    } else if (tx.status === "available") {
-                        await TxModel.updateOne(
-                            { _id: tx._id },
-                            { $set: { status: "cancelled", note: `Reversed: return approved for order ${returnReq.orderNumber}` } }
-                        );
-                        await updateWalletFn(tx.userId, { balance: -tx.amount, totalEarned: -tx.amount });
-
-                        await TxModel.create({
-                            userId:         tx.userId,
-                            orderId:        tx.orderId,
-                            orderNumber:    returnReq.orderNumber,
-                            type:           "debit",
-                            status:         "paid",
-                            gross:          tx.gross,
-                            commissionRate: tx.commissionRate,
-                            adminAmount:    tx.adminAmount,
-                            amount:         tx.amount,
-                            note:           `Return refund reversal for order ${returnReq.orderNumber}`,
-                            createdAt:      now,
-                            updatedAt:      now,
-                        });
-                    }
-                }
-            }
+            // 2. Fire the "return.approved" action hook.
+            //    The seller plugin (if active) handles wallet reversal via its
+            //    registered handler — zero direct imports needed here.
+            await doAction("return.approved", {
+                orderNumber: returnReq.orderNumber,
+                callerId:    caller.userId,
+            });
 
             // 3. Mark return request as approved + refund processed
             await returnCol.updateOne(
