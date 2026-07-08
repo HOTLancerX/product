@@ -17,8 +17,6 @@ import { useToast } from '@/components/ui/Toast';
 import Slider from './Slider';
 import Variant from './Variant';
 import Specification from './Specification';
-import { useFlashSaleOptional } from './useFlashSaleOptional';
-import { getCompareComponent } from './compareOptional';
 import type { ComponentType } from 'react';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -61,6 +59,18 @@ export interface ProductClientProps {
         city: string; state: string; bio: string; website: string;
         twitter: string; profileUrl: string;
     } | null;
+    /**
+     * Compare products — pre-selected in admin form, injected server-side.
+     * null = compare plugin not active.
+     */
+    compareProducts?: any[] | null;
+    /** All products in same category — for the compare swap dropdown. */
+    categoryProducts?: any[] | null;
+    /**
+     * Active flash-sale campaign matching this product — injected server-side.
+     * null = no active campaign or flash-sale plugin not active.
+     */
+    flashSaleCampaign?: any | null;
 }
 
 interface ShellProps {
@@ -201,27 +211,31 @@ export default function ProductClient({
     shippingOutside,
     categoryLinks = [],
     seller = null,
+    compareProducts = null,
+    categoryProducts = null,
+    flashSaleCampaign = null,
 }: ProductClientProps) {
     const { success, error } = useToast();
 
-    // ── Flash Sale ────────────────────────────────────────────────────────────
-    const { resolvePrice } = useFlashSaleOptional();
-    // displayPrice is already sellingPrice > 0 ? sellingPrice : regularPrice
-    const flashResult = resolvePrice(
-        displayPrice,
-        productId ?? data.id,
-        categoryId ?? null
-    );
-    const hasFlash        = flashResult.applied;
-    // When flash is active use campaign prices; otherwise keep original logic
-    const effectivePrice  = hasFlash ? flashResult.sellingPrice  : displayPrice;
-    const effectiveRegular = hasFlash ? flashResult.regularPrice : regularPrice;
-    const effectiveDiscount = hasFlash
-        ? flashResult.discountPercent
+    // ── Flash Sale — resolved from server-injected prop ───────────────────────
+    // applyFlashSale is a pure sync computation — no client fetch needed.
+    const hasFlash = !!flashSaleCampaign;
+    const effectivePrice       = hasFlash
+        ? (flashSaleCampaign.saleType === "fake"
+            ? displayPrice
+            : Math.round(displayPrice * (1 - flashSaleCampaign.percentage / 100) * 100) / 100)
+        : displayPrice;
+    const effectiveRegular     = hasFlash
+        ? (flashSaleCampaign.saleType === "fake"
+            ? Math.round(displayPrice * (1 + flashSaleCampaign.percentage / 100) * 100) / 100
+            : displayPrice)
+        : regularPrice;
+    const effectiveDiscount    = hasFlash
+        ? (flashSaleCampaign.saleType === "fake"
+            ? Math.round(((effectiveRegular - effectivePrice) / effectiveRegular) * 100)
+            : flashSaleCampaign.percentage)
         : discountPercent;
-    const effectiveHasDiscount = hasFlash
-        ? true
-        : (hasDiscount || (hasFlash && flashResult.regularPrice > flashResult.sellingPrice));
+    const effectiveHasDiscount = hasFlash || hasDiscount;
 
     // ── Variant selection ─────────────────────────────────────────────────────
     const [selectedVariant, setSelectedVariant] = useState<any>(
@@ -371,7 +385,7 @@ export default function ProductClient({
         whatsappNumber, facebookPageId, telegramUsername,
         shortDescription, orderNote, currencySymbol, variants,
         categoryLinks,
-        flashSaleBanner: hasFlash ? flashResult.campaign : null,
+        flashSaleBanner: hasFlash ? flashSaleCampaign : null,
     };
 
     // ── Render ────────────────────────────────────────────────────────────────
@@ -410,12 +424,12 @@ export default function ProductClient({
                 </div>
             )}
 
-            {compareIds.length > 0 && (
+            {compareIds.length > 0 && compareProducts && compareProducts.length > 0 && (
                 <div className="container my-8">
                     <CompareSection
                         currentId={data.id}
-                        currentSlug={data.slug}
-                        compareIds={compareIds}
+                        compareProducts={compareProducts}
+                        categoryProducts={categoryProducts ?? []}
                         currencySymbol={currencySymbol}
                     />
                 </div>
@@ -425,61 +439,40 @@ export default function ProductClient({
 }
 
 // ── Compare section ───────────────────────────────────────────────────────────
+// Data is injected server-side via pageData — no client fetch needed.
+// The Compare UI is dynamically imported so it's only in the bundle when used.
 
-function CompareSection({ currentId, currentSlug, compareIds, currencySymbol }: {
-    currentId: string; currentSlug: string; compareIds: string[]; currencySymbol: string;
+function CompareSection({ currentId, compareProducts, categoryProducts, currencySymbol }: {
+    currentId: string;
+    compareProducts: any[];
+    categoryProducts: any[];
+    currencySymbol: string;
 }) {
-    const sentinelRef = useRef<HTMLDivElement>(null);
-    const [compareData, setCompareData] = useState<{
-        current: any; compareProducts: any[]; categoryProducts: any[];
-    } | null>(null);
-    const [loading, setLoading] = useState(false);
-    const fetchedRef = useRef(false);
-    const [CompareComponent, setCompareComponent] = useState<ComponentType<any> | null>(null);
+    const [Comp, setComp] = useState<ComponentType<any> | null>(null);
 
-    // Resolve the Compare component — only available when compare plugin is active.
     useEffect(() => {
-        setCompareComponent(() => getCompareComponent());
+        import('@/plugin/compare/ui/Compare')
+            .then(m => setComp(() => m.default))
+            .catch(() => {});
     }, []);
 
-    useEffect(() => {
-        const el = sentinelRef.current;
-        if (!el) return;
-        const observer = new IntersectionObserver(([entry]) => {
-            if (!entry.isIntersecting || fetchedRef.current) return;
-            fetchedRef.current = true;
-            setLoading(true);
-            fetch(`/api/compare?ids=${compareIds.join(',')}&current=${currentId}`, { cache: 'no-store' })
-                .then((r) => r.json())
-                .then((d) => setCompareData(d))
-                .catch(() => {})
-                .finally(() => setLoading(false));
-        }, { rootMargin: '200px' });
-        observer.observe(el);
-        return () => observer.disconnect();
-    }, [compareIds, currentId]);
+    if (!Comp) return null;
 
-    // If compare plugin is not active, render nothing
-    if (!CompareComponent) return null;
+    // The server fetches the current product + compare products together.
+    // current = the product being viewed (matched by id), others = the rest.
+    const current  = compareProducts.find((p: any) => p.id === currentId) ?? compareProducts[0];
+    const others   = compareProducts.filter((p: any) => p.id !== currentId);
+
+    if (!current) return null;
 
     return (
-        <div ref={sentinelRef}>
-            {loading && (
-                <div className="flex items-center justify-center py-12 text-gray-400 gap-2">
-                    <Icon icon="mdi:loading" width="24" height="24" className="animate-spin" />
-                    <span>Loading comparison…</span>
-                </div>
-            )}
-            {compareData && (
-                <CompareComponent
-                    current={compareData.current}
-                    compareProducts={compareData.compareProducts}
-                    categoryProducts={compareData.categoryProducts}
-                    currencySymbol={currencySymbol}
-                    style={1}
-                />
-            )}
-        </div>
+        <Comp
+            current={current}
+            compareProducts={others}
+            categoryProducts={categoryProducts}
+            currencySymbol={currencySymbol}
+            style={1}
+        />
     );
 }
 

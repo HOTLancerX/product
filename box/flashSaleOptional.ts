@@ -3,25 +3,25 @@
 /**
  * plugin/product/box/flashSaleOptional.ts
  *
- * Flash-sale price resolution for product box components.
+ * Self-contained flash-sale types + hooks for product box components
+ * (Product-1, Product-2, Daraz-1, etc.) used inside category listings.
  *
- * Instead of importing directly from @/plugin/flash-sale/* (which breaks the
- * build when that plugin is absent), the flash-sale plugin registers a price
- * resolver via addFilter("flash-sale.resolvePrice", ...) in its index.ts.
+ * On PRODUCT pages: flashSaleCampaign is passed as a prop from server
+ * (product/lib/serverHooks → pageData → Layout1/2 → ProductClient).
+ * Box components receive it directly — no hook needed.
  *
- * When the flash-sale plugin is inactive or not installed:
- *   - No filter is registered → resolvePrice() returns the original price untouched.
+ * On CATEGORY pages: boxes are rendered client-side and receive
+ * flashSaleCampaign as a prop from the category template, which gets
+ * it from pageData.flashSaleCampaign (fetched server-side by
+ * product/lib/serverHooks "product-category" hook).
+ * useFlashSale() is kept as a fallback for any context not covered above.
  *
- * When active:
- *   - The filter runs synchronously (campaigns are cached module-level in useFlashSale).
- *   - resolvePrice() returns applied=true + discounted prices.
- *
- * No webpack aliases, no optional stubs, no cross-plugin file imports needed.
+ * NO imports from @/plugin/flash-sale/* — fully self-contained.
  */
 
 import { useState, useEffect, useRef } from "react";
 
-// ── Self-contained types (no import from flash-sale plugin) ──────────────────
+// ── Types ─────────────────────────────────────────────────────────────────────
 
 export interface FlashSaleCampaignFull {
     _id:         string;
@@ -56,63 +56,80 @@ export interface UseFlashSaleReturn {
     ) => FlashSaleResult;
 }
 
-// ── Hook registry (client-side, module-level singleton) ───────────────────────
-// The flash-sale plugin calls registerFlashSaleResolver() once when it loads.
-// Product boxes call resolveFlashSalePrice() which delegates to the resolver
-// if one is registered, or returns a noop result.
+// ── Price computation (inline — no external dependency) ───────────────────────
 
-type FlashSaleResolver = (
-    originalPrice: number,
-    productId:     string,
-    categoryId?:   string | null
-) => FlashSaleResult;
-
-let _resolver: FlashSaleResolver | null = null;
-let _readyCallbacks: Array<() => void>  = [];
-
-/**
- * Called by the flash-sale plugin (in its client-side init) to register the
- * actual price resolver. Once called, any pending useFlashSale() hooks are
- * notified via the readyCallbacks queue.
- */
-export function registerFlashSaleResolver(resolver: FlashSaleResolver): void {
-    _resolver = resolver;
-    _readyCallbacks.forEach((cb) => cb());
-    _readyCallbacks = [];
+function computeFlashSale(basePrice: number, campaign: FlashSaleCampaignFull): FlashSaleResult {
+    const pct = campaign.percentage;
+    if (campaign.saleType === "fake") {
+        const inflated      = Math.round(basePrice * (1 + pct / 100) * 100) / 100;
+        const discountShown = Math.round(((inflated - basePrice) / inflated) * 100);
+        return { applied: true, regularPrice: inflated, sellingPrice: basePrice, discountPercent: discountShown, campaign };
+    } else {
+        const discounted = Math.round(basePrice * (1 - pct / 100) * 100) / 100;
+        return { applied: true, regularPrice: basePrice, sellingPrice: discounted, discountPercent: pct, campaign };
+    }
 }
 
-// ── Noop fallback ─────────────────────────────────────────────────────────────
+function isCampaignActive(c: FlashSaleCampaignFull): boolean {
+    if (!c.isActive) return false;
+    const now = Date.now();
+    if (c.startDate && new Date(c.startDate).getTime() > now) return false;
+    if (c.endDate   && new Date(c.endDate).getTime()   < now) return false;
+    return true;
+}
 
 function noopResult(originalPrice: number): FlashSaleResult {
-    return {
-        applied: false, regularPrice: originalPrice,
-        sellingPrice: originalPrice, discountPercent: 0, campaign: null,
-    };
+    return { applied: false, regularPrice: originalPrice, sellingPrice: originalPrice, discountPercent: 0, campaign: null };
+}
+
+// ── Synchronous helper ────────────────────────────────────────────────────────
+
+/**
+ * Apply a flash-sale campaign to a price. Pure computation, no React.
+ * Used by box components that receive flashSaleCampaign as a prop.
+ */
+export function applyFlashSale(
+    basePrice: number,
+    campaign:  FlashSaleCampaignFull | null | undefined
+): FlashSaleResult {
+    if (!campaign || basePrice <= 0) return noopResult(basePrice);
+    return computeFlashSale(basePrice, campaign);
+}
+
+// ── Module-level campaign cache (client-side fallback) ────────────────────────
+// Used by useFlashSale() when no prop is available (e.g. standalone usage).
+// Fetches /api/flash-sale?active=true once per page load.
+
+let _campaigns:   FlashSaleCampaignFull[] | null = null;
+let _fetchPromise: Promise<void> | null           = null;
+
+async function loadCampaigns(): Promise<void> {
+    if (_campaigns !== null) return;
+    if (_fetchPromise)       return _fetchPromise;
+    _fetchPromise = fetch("/api/flash-sale?active=true", { cache: "no-store" })
+        .then(r => r.ok ? r.json() : { campaigns: [] })
+        .then(data => { _campaigns = Array.isArray(data.campaigns) ? data.campaigns : []; })
+        .catch(() => { _campaigns = []; });
+    return _fetchPromise;
 }
 
 // ── useFlashSale hook ─────────────────────────────────────────────────────────
 
 /**
- * Drop-in replacement for useFlashSale from the flash-sale plugin.
- * Safe to call whether or not the flash-sale plugin is active.
+ * Client hook — resolves flash-sale prices for category-listing contexts
+ * where no server-injected campaign prop is available.
+ *
+ * On product pages, prefer the flashSaleCampaign prop instead.
  */
 export function useFlashSale(): UseFlashSaleReturn {
-    const [ready, setReady] = useState(_resolver !== null);
-    const mountedRef = useRef(true);
+    const [ready, setReady]  = useState(_campaigns !== null);
+    const mountedRef         = useRef(true);
 
     useEffect(() => {
         mountedRef.current = true;
-        if (_resolver !== null) {
-            setReady(true);
-            return;
-        }
-        // Wait for the resolver to be registered (flash-sale plugin init)
-        const cb = () => { if (mountedRef.current) setReady(true); };
-        _readyCallbacks.push(cb);
-        return () => {
-            mountedRef.current = false;
-            _readyCallbacks = _readyCallbacks.filter((c) => c !== cb);
-        };
+        if (_campaigns !== null) { setReady(true); return; }
+        loadCampaigns().then(() => { if (mountedRef.current) setReady(true); });
+        return () => { mountedRef.current = false; };
     }, []);
 
     const resolvePrice = (
@@ -120,30 +137,18 @@ export function useFlashSale(): UseFlashSaleReturn {
         productId:     string,
         categoryId?:   string | null
     ): FlashSaleResult => {
-        if (!_resolver) return noopResult(originalPrice);
-        return _resolver(originalPrice, productId, categoryId);
+        if (!_campaigns?.length) return noopResult(originalPrice);
+        for (const c of _campaigns) {
+            if (!isCampaignActive(c)) continue;
+            if (c.targetType === "product" && c.productIds.includes(productId)) {
+                return computeFlashSale(originalPrice, c);
+            }
+            if (c.targetType === "category" && categoryId && c.categoryIds.includes(categoryId)) {
+                return computeFlashSale(originalPrice, c);
+            }
+        }
+        return noopResult(originalPrice);
     };
 
     return { ready, resolvePrice };
-}
-
-/**
- * Synchronous price resolver — safe to call outside React.
- * Returns the original price when flash-sale plugin is inactive.
- */
-export function applyFlashSale(
-    originalPrice: number,
-    campaign:      FlashSaleCampaignFull | null | undefined
-): FlashSaleResult {
-    if (!campaign) return noopResult(originalPrice);
-    // Inline the computation so this file has zero cross-plugin imports.
-    const pct = campaign.percentage;
-    if (campaign.saleType === "fake") {
-        const inflated      = Math.round(originalPrice * (1 + pct / 100) * 100) / 100;
-        const discountShown = Math.round(((inflated - originalPrice) / inflated) * 100);
-        return { applied: true, regularPrice: inflated, sellingPrice: originalPrice, discountPercent: discountShown, campaign };
-    } else {
-        const discounted = Math.round(originalPrice * (1 - pct / 100) * 100) / 100;
-        return { applied: true, regularPrice: originalPrice, sellingPrice: discounted, discountPercent: pct, campaign };
-    }
 }

@@ -25,13 +25,20 @@ interface ProductPageProps {
     };
     settings?: Record<string, any>;
     permalinkMap?: Record<string, string>;
-    /** Injected by serverDataHooks: { ancestors: [...], seller: {...} | null } */
+    /**
+     * Injected by product/lib/serverHooks:
+     *   ancestors        — category breadcrumb
+     *   seller           — seller card info
+     *   compareProducts  — pre-selected compare items (compare plugin)
+     *   categoryProducts — all items in same category (compare plugin)
+     *   flashSaleCampaign — active campaign for this product (flash-sale plugin)
+     */
     pageData?: {
-        ancestors?: { _id: string; title: string; slug: string }[];
-        seller?: {
-            _id: string; name: string; image: string; slug: string;
-            city: string; state: string; bio: string; website: string; twitter: string;
-        } | null;
+        ancestors?:        { _id: string; title: string; slug: string }[];
+        seller?:           { _id: string; name: string; image: string; slug: string; city: string; state: string; bio: string; website: string; twitter: string; } | null;
+        compareProducts?:  any[] | null;
+        categoryProducts?: any[] | null;
+        flashSaleCampaign?: any | null;
     };
 }
 
@@ -90,8 +97,11 @@ export default function ProductLayout1({ data, settings = {}, permalinkMap = {},
         : 0;
 
     // ── Category breadcrumb from pageData (injected server-side, no fetch) ──
-    const ancestors  = pageData?.ancestors ?? [];
-    const seller     = pageData?.seller    ?? null;
+    const ancestors        = pageData?.ancestors        ?? [];
+    const seller           = pageData?.seller           ?? null;
+    const compareProducts  = pageData?.compareProducts  ?? null;
+    const categoryProducts = pageData?.categoryProducts ?? null;
+    const flashSaleCampaign = pageData?.flashSaleCampaign ?? null;
     const catPrefix  = (permalinkMap['product-category'] ?? 'product/category')
         .trim().replace(/^\/+|\/+$/g, '');
     const categoryLinks = ancestors.map(cat => ({
@@ -133,6 +143,9 @@ export default function ProductLayout1({ data, settings = {}, permalinkMap = {},
             shippingInside={shippingInside}
             shippingOutside={shippingOutside}
             categoryLinks={categoryLinks}
+            compareProducts={compareProducts}
+            categoryProducts={categoryProducts}
+            flashSaleCampaign={flashSaleCampaign}
             seller={seller ? {
                 ...seller,
                 profileUrl: buildUrl(sellerPrefix, seller.slug),

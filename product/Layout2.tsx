@@ -2,7 +2,6 @@
  * Product Layout 2 — Dark storefront style.
  *
  * Identical data pipeline to Layout1. Passes layout={2} to ProductClient.
- * Receives pageData.ancestors from serverDataHooks for the breadcrumb.
  */
 
 import ProductClient from './ProductClient';
@@ -20,7 +19,13 @@ interface ProductPageProps {
     };
     settings?: Record<string, any>;
     permalinkMap?: Record<string, string>;
-    pageData?: { ancestors?: { _id: string; title: string; slug: string }[] };
+    pageData?: {
+        ancestors?:        { _id: string; title: string; slug: string }[];
+        seller?:           { _id: string; name: string; image: string; slug: string; city: string; state: string; bio: string; website: string; twitter: string; } | null;
+        compareProducts?:  any[] | null;
+        categoryProducts?: any[] | null;
+        flashSaleCampaign?: any | null;
+    };
 }
 
 function parseJson<T>(raw: string | undefined, fallback: T): T {
@@ -75,7 +80,10 @@ export default function ProductLayout2({ data, settings = {}, permalinkMap = {},
         ? (sellingPrice > 0 ? sellingPrice : regularPrice)
         : 0;
 
-    const ancestors  = pageData?.ancestors ?? [];
+    const ancestors        = pageData?.ancestors        ?? [];
+    const compareProducts  = pageData?.compareProducts  ?? null;
+    const categoryProducts = pageData?.categoryProducts ?? null;
+    const flashSaleCampaign = pageData?.flashSaleCampaign ?? null;
     const catPrefix  = (permalinkMap['product-category'] ?? 'product/category')
         .trim().replace(/^\/+|\/+$/g, '');
     const categoryLinks = ancestors.map(cat => ({
@@ -113,6 +121,9 @@ export default function ProductLayout2({ data, settings = {}, permalinkMap = {},
             shippingInside={shippingInside}
             shippingOutside={shippingOutside}
             categoryLinks={categoryLinks}
+            compareProducts={compareProducts}
+            categoryProducts={categoryProducts}
+            flashSaleCampaign={flashSaleCampaign}
         />
     );
 }

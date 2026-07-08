@@ -45,4 +45,10 @@ export interface CategoryPageData {
     activeBox:        { label: string; pluginNx: string } | null;
     /** Attribute filter groups — empty when no attributes are linked to this category */
     attributeOptions: AttributeOption[];
+    /**
+     * Active flash-sale campaign that targets this category or its products.
+     * null when flash-sale plugin is not installed or no campaign is active.
+     * Passed as a prop to product box components — no client fetch needed.
+     */
+    flashSaleCampaign?: any | null;
 }
