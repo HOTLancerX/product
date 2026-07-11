@@ -12,6 +12,7 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import { Icon } from "@iconify/react";
+import useSettings from "@/lib/useSettings";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -97,8 +98,9 @@ const TIMELINE_ICONS: Record<string, string> = {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function fmt(n: number) {
-    return Number(n).toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+function fmt(n: number, symbol?: string) {
+    const formatted = Number(n).toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+    return symbol ? `${symbol}${formatted}` : formatted;
 }
 
 function fmtDate(iso: string) {
@@ -157,6 +159,8 @@ export default function AdminOrderDetailPage() {
     const [saving,     setSaving]     = useState(false);
     const [saveMsg,    setSaveMsg]    = useState("");
     const [locationMap, setLocationMap] = useState<Record<string, string>>({});
+    const { settings } = useSettings();
+    const currency = (settings?.product_currency_symbol || settings?.currency_symbol || "") as string;
 
     // ── Fetch order by _id ────────────────────────────────────────────────────
 
@@ -341,10 +345,10 @@ export default function AdminOrderDetailPage() {
                                         )}
                                         {item.sku && <p className="text-xs text-gray-400">SKU: {item.sku}</p>}
                                         {item.orderNote && <p className="text-xs text-gray-500 mt-1 italic">Note: {item.orderNote}</p>}
-                                        <p className="text-xs text-gray-400 mt-0.5">×{item.quantity} @ {fmt(item.price)}</p>
+                                        <p className="text-xs text-gray-400 mt-0.5">×{item.quantity} @ {fmt(item.price, currency)}</p>
                                     </div>
                                     <div className="text-right shrink-0">
-                                        <p className="text-sm font-bold text-gray-900">{fmt(item.subtotal)}</p>
+                                        <p className="text-sm font-bold text-gray-900">{fmt(item.subtotal, currency)}</p>
                                     </div>
                                 </div>
                             ))}
@@ -352,23 +356,26 @@ export default function AdminOrderDetailPage() {
                         <div className="mt-4 pt-4 border-t border-gray-100 space-y-1.5">
                             <div className="flex justify-between text-sm text-gray-600">
                                 <span>Subtotal</span>
-                                <span className="font-medium">{fmt(order.subtotal)}</span>
+                                <span className="font-medium">{fmt(order.subtotal, currency)}</span>
                             </div>
                             <div className="flex justify-between text-sm text-gray-600">
                                 <span>Shipping <span className="text-xs text-gray-400">({order.shippingMethod})</span></span>
-                                <span className="font-medium">{fmt(order.shippingCost)}</span>
+                                <span className="font-medium">{fmt(order.shippingCost, currency)}</span>
                             </div>
                             <div className="flex justify-between text-base font-bold text-gray-900 pt-2 border-t border-gray-100">
                                 <span>Total</span>
-                                <span>{fmt(order.total)}</span>
+                                <span>{fmt(order.total, currency)}</span>
                             </div>
                         </div>
                     </Card>
 
                     {/* Shipping address */}
                     <Card title="Shipping Address" icon="mdi:map-marker-outline">
-                        <div className="text-sm text-gray-700 space-y-1">
-                            <p className="font-semibold text-gray-900">{order.shippingAddress.name}</p>
+                        <div className="text-sm text-gray-700 space-y-3">
+                            <p className="flex items-center gap-1.5 font-semibold text-gray-900">
+                                <Icon icon="uil:user" width={14} />
+                                {order.shippingAddress.name}
+                            </p>
                             {order.shippingAddress.phone && (
                                 <p className="flex items-center gap-1.5 text-gray-500">
                                     <Icon icon="mdi:phone-outline" width={14} />
@@ -381,9 +388,17 @@ export default function AdminOrderDetailPage() {
                                     {order.shippingAddress.email}
                                 </p>
                             )}
-                            {order.shippingAddress.address && <p>{order.shippingAddress.address}</p>}
+                            {order.shippingAddress.address &&
+                                <p className="flex items-center gap-1.5 font-semibold text-gray-900">
+                                    <Icon icon="uil:map-marker-alt" width={14} />
+                                    {order.shippingAddress.address}
+                                </p>
+                            }
                             {(order.shippingAddress.city || order.shippingAddress.state) && (
-                                <p>{[locationMap[order.shippingAddress.city] || order.shippingAddress.city, locationMap[order.shippingAddress.state] || order.shippingAddress.state].filter(Boolean).join(", ")}</p>
+                                <p className="flex items-center gap-1.5 font-semibold text-gray-900">
+                                    <Icon icon="uil:map-marker-alt" width={14} />
+                                    {[locationMap[order.shippingAddress.city] || order.shippingAddress.city, locationMap[order.shippingAddress.state] || order.shippingAddress.state].filter(Boolean).join(", ")}
+                                </p>
                             )}
                             {order.shippingAddress.zipCode && <p>{order.shippingAddress.zipCode}</p>}
                         </div>
