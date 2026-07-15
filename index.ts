@@ -1,6 +1,8 @@
-import { addHook, addPostType, addCatType, type PluginMeta } from "@/hook";
+import { addHook, addPostType, addCatType, addBuilderElement, type PluginMeta } from "@/hook";
 import { Text, Textarea, Select, Switch, CategoryHierarchicalSelect } from "@/components/ui";
 import { registerLazyComponent } from "@/hook/pluginHooks";
+import cartElement from "./elements/Cart";
+import cartListElement from "./elements/CartList";
 
 // ─── Lazy component registrations ─────────────────────────────────────────────
 // Heavy page components are NOT imported at module load time.
@@ -40,6 +42,10 @@ export const PLUGINS: PluginMeta = {
  * Called by PluginList.reregisterHooks() after the gate is armed.
  */
 export function register() {
+    // ─── Register Builder Elements ───────────────────────────────────────────
+    addBuilderElement(cartElement, PLUGINS.nx);
+    addBuilderElement(cartListElement, PLUGINS.nx);
+
     // ─── Register lazy page components ───────────────────────────────────────
     // These are registered once per register() call (dedup is inside
     // registerLazyComponent — last write wins on re-register / hot-reload).
