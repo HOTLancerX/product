@@ -3,6 +3,15 @@ import { Text, Textarea, Select, Switch, CategoryHierarchicalSelect } from "@/co
 import { registerLazyComponent } from "@/hook/pluginHooks";
 import cartElement from "./elements/Cart";
 import cartListElement from "./elements/CartList";
+import productTitleElement from "./elements/product/ProductTitle";
+import productPriceElement from "./elements/product/ProductPrice";
+import productSliderElement from "./elements/product/ProductSlider";
+import productVariantsElement from "./elements/product/ProductVariants";
+import productQtyAndCartElement from "./elements/product/ProductQtyAndCart";
+import productSpecsElement from "./elements/product/ProductSpecs";
+import productDescriptionElement from "./elements/product/ProductDescription";
+import productMetaElement from "./elements/product/ProductMeta";
+import productRelatedElement from "./elements/product/Related";
 
 // ─── Lazy component registrations ─────────────────────────────────────────────
 // Heavy page components are NOT imported at module load time.
@@ -45,6 +54,15 @@ export function register() {
     // ─── Register Builder Elements ───────────────────────────────────────────
     addBuilderElement(cartElement, PLUGINS.nx);
     addBuilderElement(cartListElement, PLUGINS.nx);
+    addBuilderElement(productTitleElement, PLUGINS.nx);
+    addBuilderElement(productPriceElement, PLUGINS.nx);
+    addBuilderElement(productSliderElement, PLUGINS.nx);
+    addBuilderElement(productVariantsElement, PLUGINS.nx);
+    addBuilderElement(productQtyAndCartElement, PLUGINS.nx);
+    addBuilderElement(productSpecsElement, PLUGINS.nx);
+    addBuilderElement(productDescriptionElement, PLUGINS.nx);
+    addBuilderElement(productMetaElement, PLUGINS.nx);
+    addBuilderElement(productRelatedElement, PLUGINS.nx);
 
     // ─── Register lazy page components ───────────────────────────────────────
     // These are registered once per register() call (dedup is inside
