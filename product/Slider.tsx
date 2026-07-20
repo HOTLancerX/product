@@ -4,7 +4,7 @@
  * Slider.tsx — Product image slider for the public product page.
  *
  * Features:
- *  - Main slide (fade transition) synced with thumbnail strip via react-slick
+ *  - Main slide synced with thumbnail strip via embla-carousel-react
  *  - Thumbnail strip (up to 5 visible, scrollable)
  *  - Slide counter badge (current / total)
  *  - Custom prev/next arrows that appear on hover
@@ -14,11 +14,9 @@
  * Used by Layout1 and Layout2.
  */
 
-import { useRef, useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Image from 'next/image';
-import SlickSlider from 'react-slick';
-import 'slick-carousel/slick/slick.css';
-import 'slick-carousel/slick/slick-theme.css';
+import useEmblaCarousel from 'embla-carousel-react';
 import { Icon } from '@iconify/react';
 
 interface SliderProps {
@@ -78,12 +76,41 @@ export default function Slider({
     aspectClass = 'aspect-square',
 }: SliderProps) {
     const [currentSlide, setCurrentSlide] = useState(0);
-    const mainRef  = useRef<SlickSlider>(null);
-    const thumbRef = useRef<SlickSlider>(null);
 
-    // Keep slider instances for asNavFor sync
-    const [mainSlider, setMainSlider]   = useState<SlickSlider | null>(null);
-    const [thumbSlider, setThumbSlider] = useState<SlickSlider | null>(null);
+    const hasMultiple = gallery && gallery.length > 1;
+
+    const [mainRef, mainApi] = useEmblaCarousel({
+        loop: hasMultiple,
+        duration: 25,
+    });
+
+    const [thumbRef, thumbApi] = useEmblaCarousel({
+        containScroll: 'keepSnaps',
+        dragFree: true,
+    });
+
+    const onSelect = useCallback(() => {
+        if (!mainApi || !thumbApi) return;
+        const index = mainApi.selectedScrollSnap();
+        setCurrentSlide(index);
+        thumbApi.scrollTo(index);
+    }, [mainApi, thumbApi]);
+
+    useEffect(() => {
+        if (!mainApi) return;
+        onSelect();
+        mainApi.on('select', onSelect);
+        mainApi.on('reInit', onSelect);
+        return () => {
+            mainApi.off('select', onSelect);
+            mainApi.off('reInit', onSelect);
+        };
+    }, [mainApi, onSelect]);
+
+    const handleThumbClick = useCallback((index: number) => {
+        if (!mainApi) return;
+        mainApi.scrollTo(index);
+    }, [mainApi]);
 
     // ── Empty state ───────────────────────────────────────────────────────────
     if (!gallery || gallery.length === 0) {
@@ -97,63 +124,35 @@ export default function Slider({
         );
     }
 
-    const hasMultiple = gallery.length > 1;
-    const thumbCount  = Math.min(5, gallery.length);
-
-    const mainSettings = {
-        dots: false,
-        infinite: hasMultiple,
-        speed: 400,
-        slidesToShow: 1,
-        slidesToScroll: 1,
-        fade: true,
-        arrows: hasMultiple,
-        nextArrow: <NextArrow />,
-        prevArrow: <PrevArrow />,
-        beforeChange: (_: number, next: number) => setCurrentSlide(next),
-        asNavFor: thumbSlider ?? undefined,
-    };
-
-    const thumbSettings = {
-        dots: false,
-        infinite: false,
-        speed: 300,
-        slidesToShow: thumbCount,
-        slidesToScroll: 1,
-        focusOnSelect: true,
-        arrows: false,
-        asNavFor: mainSlider ?? undefined,
-        responsive: [
-            {
-                breakpoint: 768,
-                settings: { slidesToShow: Math.min(4, gallery.length) },
-            },
-        ],
-    };
-
     return (
         <div className="w-full space-y-3">
             {/* ── Main slide ── */}
             <div className={`relative w-full ${aspectClass} overflow-hidden rounded-2xl bg-gray-50 group`}>
-                <SlickSlider
-                    ref={(s) => { mainRef.current = s; setMainSlider(s); }}
-                    {...mainSettings}
-                >
-                    {gallery.map((img, idx) => (
-                        <div key={idx}>
-                            <div className={`relative w-full ${aspectClass}`}>
-                                <Image
-                                    src={img}
-                                    alt={`${alt} — image ${idx + 1}`}
-                                    fill
-                                    sizes="(max-width: 768px) 100vw, 50vw"
-                                    className="object-contain"
-                                    priority={idx === 0}
-                                />
+                <div className="overflow-hidden w-full h-full" ref={mainRef}>
+                    <div className="flex w-full h-full">
+                        {gallery.map((img, idx) => (
+                            <div key={idx} className="flex-[0_0_100%] min-w-0">
+                                <div className={`relative w-full ${aspectClass}`}>
+                                    <Image
+                                        src={img}
+                                        alt={`${alt} — image ${idx + 1}`}
+                                        fill
+                                        sizes="(max-width: 768px) 100vw, 50vw"
+                                        className="object-contain"
+                                        priority={idx === 0}
+                                    />
+                                </div>
                             </div>
-                        </div>
-                    ))}
-                </SlickSlider>
+                        ))}
+                    </div>
+                </div>
+
+                {hasMultiple && (
+                    <>
+                        <PrevArrow onClick={() => mainApi?.scrollPrev()} />
+                        <NextArrow onClick={() => mainApi?.scrollNext()} />
+                    </>
+                )}
 
                 {/* Slide counter */}
                 {hasMultiple && (
@@ -173,38 +172,43 @@ export default function Slider({
 
             {/* ── Thumbnail strip ── */}
             {hasMultiple && (
-                <SlickSlider
-                    ref={(s) => { thumbRef.current = s; setThumbSlider(s); }}
-                    {...thumbSettings}
-                >
-                    {gallery.map((img, idx) => (
-                        <div key={idx} className="px-1">
-                            <button
-                                type="button"
-                                aria-label={`View image ${idx + 1}`}
-                                onClick={() => {
-                                    mainRef.current?.slickGoTo(idx);
-                                    setCurrentSlide(idx);
-                                }}
-                                className={`
-                                    relative w-full aspect-square rounded-lg overflow-hidden border-2 transition-all
-                                    ${currentSlide === idx
-                                        ? 'border-blue-500 ring-2 ring-blue-200 shadow-md'
-                                        : 'border-gray-200 hover:border-gray-400'
-                                    }
-                                `}
-                            >
-                                <Image
-                                    src={img}
-                                    alt={`Thumbnail ${idx + 1}`}
-                                    fill
-                                    sizes="80px"
-                                    className="object-cover"
-                                />
-                            </button>
-                        </div>
-                    ))}
-                </SlickSlider>
+                <div className="overflow-hidden w-full" ref={thumbRef}>
+                    <div className="flex -mx-1">
+                        {gallery.map((img, idx) => {
+                            const basisClass = gallery.length === 2
+                                ? 'flex-[0_0_50%]'
+                                : gallery.length === 3
+                                ? 'flex-[0_0_33.333%]'
+                                : gallery.length === 4
+                                ? 'flex-[0_0_25%]'
+                                : 'flex-[0_0_25%] md:flex-[0_0_20%]';
+                            return (
+                                <div key={idx} className={`px-1 min-w-0 ${basisClass}`}>
+                                    <button
+                                        type="button"
+                                        aria-label={`View image ${idx + 1}`}
+                                        onClick={() => handleThumbClick(idx)}
+                                        className={`
+                                            relative w-full aspect-square rounded-lg overflow-hidden border-2 transition-all
+                                            ${currentSlide === idx
+                                                ? 'border-blue-500 ring-2 ring-blue-200 shadow-md'
+                                                : 'border-gray-200 hover:border-gray-400'
+                                            }
+                                        `}
+                                    >
+                                        <Image
+                                            src={img}
+                                            alt={`Thumbnail ${idx + 1}`}
+                                            fill
+                                            sizes="80px"
+                                            className="object-cover"
+                                        />
+                                    </button>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
             )}
         </div>
     );
