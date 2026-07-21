@@ -52,6 +52,11 @@ export interface ProductClientProps {
     orderNote: string;
     shippingInside?: number;
     shippingOutside?: number;
+    shippingInsideLabel?: string;
+    shippingOutsideLabel?: string;
+    shippingInsideRate?: number;
+    shippingOutsideRate?: number;
+    relatedCols?: number;
     /** Category breadcrumb — root to leaf, each with title + url */
     categoryLinks?: { title: string; url: string }[];
     /** Seller info — injected server-side from PostInfo userId → User */

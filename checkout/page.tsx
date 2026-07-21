@@ -370,12 +370,18 @@ export default function CheckoutPage() {
         const globalOutsideRate = parseFloat(settings?.shipping_outside_rate as string) || 0;
 
         return selectedCartItems.reduce((sum, item) => {
+            const isInside = formData.shippingMethod === 'inside';
+            const rawCost  = isInside ? item.shippingInside : item.shippingOutside;
+            const globalRate = isInside ? globalInsideRate : globalOutsideRate;
+
             let shippingCost: number;
-            if (formData.shippingMethod === 'inside') {
-                shippingCost = item.shippingInside ?? globalInsideRate;
+            if (rawCost === undefined || rawCost === null || (rawCost as any) === "") {
+                shippingCost = globalRate;
             } else {
-                shippingCost = item.shippingOutside ?? globalOutsideRate;
+                const parsed = typeof rawCost === 'number' ? rawCost : parseFloat(String(rawCost));
+                shippingCost = isNaN(parsed) ? globalRate : parsed;
             }
+
             return sum + (shippingCost * item.quantity);
         }, 0);
     };

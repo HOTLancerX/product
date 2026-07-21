@@ -1,5 +1,5 @@
 import { addHook, addPostType, addCatType, addBuilderElement, type PluginMeta } from "@/hook";
-import { Text, Textarea, Select, Switch, CategoryHierarchicalSelect } from "@/components/ui";
+import { Text, Textarea, Select, Switch, CategoryHierarchicalSelect, Number } from "@/components/ui";
 import { registerLazyComponent } from "@/hook/pluginHooks";
 import cartElement from "./elements/Cart";
 import cartListElement from "./elements/CartList";
@@ -190,6 +190,15 @@ export function register() {
             hierarchicalCatType: "product-category",
         },
         {
+            key: "brand",
+            label: "Brand",
+            type: "product",
+            style: "right",
+            position: 6,
+            component: CategoryHierarchicalSelect,
+            hierarchicalCatType: "brands",
+        },
+        {
             key: "sku",
             label: "SKU",
             type: "product",
@@ -244,18 +253,26 @@ export function register() {
         },
         {
             key: "shipping_inside",
-            label: "Inside Shipping Cost (per item)",
+            label: "Inside Shipping",
             type: "product",
             style: "right",
             position: 80,
-            component: Text,
+            component: Number,
         },
         {
             key: "shipping_outside",
-            label: "Outside Shipping Cost (per item)",
+            label: "Outside Shipping",
             type: "product",
             style: "right",
             position: 85,
+            component: Number,
+        },
+        {
+            key: "warranty",
+            label: "Warranty",
+            type: "product",
+            style: "right",
+            position: 90,
             component: Text,
         },
     ], PLUGINS.nx);

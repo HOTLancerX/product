@@ -20,6 +20,10 @@ import { getCategoryPageData, getCategoryAncestors } from "./category";
 import connectDB from "@/lib/mongodb";
 import User from "@/models/Users";
 import UserInfo from "@/models/Users_info";
+import Post from "@/models/post";
+import PostInfo from "@/models/post_info";
+import Cat from "@/models/cat";
+import { Settings } from "@/lib/settings";
 
 // ── Category types ────────────────────────────────────────────────────────────
 
@@ -70,12 +74,74 @@ registerServerDataHook("product", async (id, _slug, data) => {
         } catch { /* non-critical */ }
     }
 
+    // ── Related products in same category ─────────────────────────────────
+    let categoryProducts: any[] = [];
+    if (categoryId) {
+        try {
+            const settingsObj = await Settings();
+            const limit = parseInt(settingsObj?.related_products_total as string ?? "12", 10) || 12;
+
+            const catPosts = await Post.find({
+                category: categoryId,
+                type: "product",
+                status: "published",
+                _id: { $ne: id },
+            }).limit(limit).lean() as any[];
+
+            if (catPosts.length > 0) {
+                const postIds = catPosts.map((p) => p._id);
+                const infoDocs = await PostInfo.find({ postId: { $in: postIds } }).lean() as any[];
+                const infoByPost: Record<string, Record<string, string>> = {};
+                infoDocs.forEach((d) => {
+                    const pid = String(d.postId);
+                    if (!infoByPost[pid]) infoByPost[pid] = {};
+                    infoByPost[pid][d.name] = String(d.value ?? "");
+                });
+
+                categoryProducts = catPosts.map((p) => ({
+                    _id:       String(p._id),
+                    title:     String(p.title    ?? ""),
+                    slug:      String(p.slug     ?? ""),
+                    type:      String(p.type     ?? ""),
+                    status:    String(p.status   ?? ""),
+                    category:  p.category ? String(p.category) : null,
+                    createdAt: p.createdAt instanceof Date ? p.createdAt.toISOString() : String(p.createdAt ?? ""),
+                    updatedAt: p.updatedAt instanceof Date ? p.updatedAt.toISOString() : String(p.updatedAt ?? ""),
+                    info:      infoByPost[String(p._id)] || {},
+                }));
+            }
+        } catch { /* non-critical */ }
+    }
+
+    // ── Brand Info ────────────────────────────────────────────────────────
+    const brandId = data?.info?.brand || data?.info?.brandId || (data as any)?.brand;
+    let brand: { _id: string; title: string; slug: string } | null = null;
+    if (brandId) {
+        try {
+            let catDoc = await Cat.findOne({ _id: brandId, type: "brands" }).lean() as any;
+            if (!catDoc) {
+                catDoc = await Cat.findOne({ slug: String(brandId), type: "brands" }).lean() as any;
+            }
+            if (!catDoc) {
+                catDoc = await Cat.findOne({ title: String(brandId), type: "brands" }).lean() as any;
+            }
+            if (catDoc) {
+                brand = {
+                    _id:   String(catDoc._id),
+                    title: String(catDoc.title ?? ""),
+                    slug:  String(catDoc.slug  ?? ""),
+                };
+            }
+        } catch { /* non-critical */ }
+    }
+
     // Base pageData — other plugins enrich via registerProductEnricher()
     const base: Record<string, any> = {
         ancestors,
         seller,
+        brand,
         compareProducts:   [],
-        categoryProducts:  [],
+        categoryProducts,
         flashSaleCampaign: null,
     };
 

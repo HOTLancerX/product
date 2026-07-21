@@ -39,6 +39,7 @@ interface ProductPageProps {
         compareProducts?:  any[] | null;
         categoryProducts?: any[] | null;
         flashSaleCampaign?: any | null;
+        brand?:             { _id: string; title: string; slug: string } | null;
     };
 }
 
@@ -109,6 +110,12 @@ export default function ProductLayout1({ data, settings = {}, permalinkMap = {},
         url:   buildUrl(catPrefix, cat.slug),
     }));
 
+    const shippingInsideLabel  = (settings.shipping_inside_label  as string) || "Inside Shipping";
+    const shippingOutsideLabel = (settings.shipping_outside_label as string) || "Outside Shipping";
+    const shippingInsideRate   = parseFloat(settings.shipping_inside_rate  as string) || 0;
+    const shippingOutsideRate  = parseFloat(settings.shipping_outside_rate as string) || 0;
+    const relatedCols          = parseInt(settings.related_products_cols   as string ?? "6", 10) || 6;
+
     // Build seller profile URL using the "seller" permalink prefix
     const sellerPrefix = (permalinkMap['seller'] ?? 'seller')
         .trim().replace(/^\/+|\/+$/g, '') || 'seller';
@@ -142,6 +149,11 @@ export default function ProductLayout1({ data, settings = {}, permalinkMap = {},
             orderNote={orderNote}
             shippingInside={shippingInside}
             shippingOutside={shippingOutside}
+            shippingInsideLabel={shippingInsideLabel}
+            shippingOutsideLabel={shippingOutsideLabel}
+            shippingInsideRate={shippingInsideRate}
+            shippingOutsideRate={shippingOutsideRate}
+            relatedCols={relatedCols}
             categoryLinks={categoryLinks}
             compareProducts={compareProducts}
             categoryProducts={categoryProducts}
