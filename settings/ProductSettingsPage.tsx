@@ -59,6 +59,12 @@ const TABS: Tab[] = [
         icon:        "solar:card-bold",
         description: "Configure payment gateways available at checkout.",
     },
+    {
+        key:         "header",
+        label:       "Header",
+        icon:        "solar:sidebar-minimalistic-bold",
+        description: "Configure site header options, search placeholders, and mobile app download banners.",
+    },
 ];
 
 export default function ProductSettingsPage() {
@@ -140,6 +146,14 @@ export default function ProductSettingsPage() {
 
             {activeTab === "payment" && (
                 <PaymentGatewaySettings initialValues={settings} />
+            )}
+
+            {activeTab === "header" && (
+                <FormSettings
+                    type="product-header"
+                    activePlugins={activePlugins}
+                    initialValues={settings}
+                />
             )}
         </div>
     );

@@ -660,6 +660,51 @@ export function register() {
         },
     ], PLUGINS.nx);
 
+    // ─── Header settings form fields ─────────────────────────────────────────
+    // type: "product-header" → shown on the Header tab of product settings.
+    addHook("setting.form", [
+        {
+            key: "header_search_placeholder",
+            label: "Header Search Placeholder",
+            type: "product-header",
+            style: "left",
+            position: 10,
+            component: Text,
+        },
+        {
+            key: "header_app_banner_enabled",
+            label: "Enable Mobile App Banner",
+            type: "product-header",
+            style: "left",
+            position: 20,
+            component: Switch,
+        },
+        {
+            key: "header_app_banner_title",
+            label: "Mobile App Banner Title",
+            type: "product-header",
+            style: "left",
+            position: 30,
+            component: Text,
+        },
+        {
+            key: "header_app_banner_subtitle",
+            label: "Mobile App Banner Subtitle",
+            type: "product-header",
+            style: "left",
+            position: 40,
+            component: Text,
+        },
+        {
+            key: "header_app_banner_button",
+            label: "Mobile App Banner Button Text",
+            type: "product-header",
+            style: "left",
+            position: 50,
+            component: Text,
+        },
+    ], PLUGINS.nx);
+
     // ─── Shipping settings form fields ──────────────────────────────────────
     // type: "product-shipping" → shown on the Shipping tab of product settings.
     addHook("setting.form", [
