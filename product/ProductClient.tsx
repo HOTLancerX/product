@@ -18,6 +18,7 @@ import Slider from './Slider';
 import Variant from './Variant';
 import Specification from './Specification';
 import type { ComponentType } from 'react';
+import { resolveLazyComponent } from '@/hook/pluginHooks';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -451,8 +452,10 @@ function CompareSection({ currentId, compareProducts, categoryProducts, currency
     const [Comp, setComp] = useState<ComponentType<any> | null>(null);
 
     useEffect(() => {
-        import('@/plugin/compare/ui/Compare')
-            .then(m => setComp(() => m.default))
+        resolveLazyComponent("product.Compare")
+            .then(comp => {
+                if (comp) setComp(() => comp);
+            })
             .catch(() => {});
     }, []);
 
