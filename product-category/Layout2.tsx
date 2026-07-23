@@ -13,13 +13,15 @@ import ProductGridClient from './ProductGridClient';
 
 interface ProductCatProps {
     data: {
-        _id:       string;
-        title:     string;
-        slug:      string;
-        status:    string;
-        createdAt: string;
-        updatedAt: string;
-        info:      Record<string, string>;
+        _id:               string;
+        title:             string;
+        slug:              string;
+        description?:      string;
+        shortDescription?: string;
+        status:            string;
+        createdAt:         string;
+        updatedAt:         string;
+        info:              Record<string, string>;
     };
     settings?:     Record<string, any>;
     permalinkMap?: Record<string, string>;
@@ -177,6 +179,9 @@ export default function ProductCategoryLayout2({
     const activeBox   = pageData?.activeBox       ?? null;
     const attrOptions = pageData?.attributeOptions ?? [];
 
+    const shortDescription = data.info?.shortDescription || data.info?.short_description || data.shortDescription || '';
+    const description      = data.description || data.info?.description || '';
+
     const filterEnabled = settings.product_cat_filter_enabled !== '0';
     const priceFilter   = settings.product_cat_price_filter   !== '0';
     const sortEnabled   = settings.product_cat_sort_enabled   !== '0';
@@ -263,6 +268,12 @@ export default function ProductCategoryLayout2({
                     <h1 className="text-3xl sm:text-5xl font-extrabold text-white leading-tight capitalize">
                         {data.title}
                     </h1>
+                    {shortDescription && (
+                        <div
+                            className="text-white/80 text-sm sm:text-base mt-2 max-w-3xl leading-relaxed"
+                            dangerouslySetInnerHTML={{ __html: shortDescription }}
+                        />
+                    )}
                     <div className="flex items-center gap-3 mt-4 flex-wrap">
                         <span className="text-white/50 text-sm">
                             {allProducts.length} product{allProducts.length !== 1 ? 's' : ''}
@@ -310,7 +321,18 @@ export default function ProductCategoryLayout2({
                 >
                     {cardGrid}
                 </ProductGridClient>
+
+                {/* Category Description (Bottom) */}
+                {description && (
+                    <div className="bg-white/5 rounded-2xl border border-white/10 p-6 md:p-8 mt-8">
+                        <div
+                            className="prose prose-invert max-w-none text-white/80 description"
+                            dangerouslySetInnerHTML={{ __html: description }}
+                        />
+                    </div>
+                )}
             </div>
         </main>
     );
 }
+

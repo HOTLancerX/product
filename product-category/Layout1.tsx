@@ -24,13 +24,15 @@ import ProductGridClient from './ProductGridClient';
 
 interface ProductCatProps {
     data: {
-        _id:       string;
-        title:     string;
-        slug:      string;
-        status:    string;
-        createdAt: string;
-        updatedAt: string;
-        info:      Record<string, string>;
+        _id:               string;
+        title:             string;
+        slug:              string;
+        description:       string;
+        shortDescription?: string;
+        status:            string;
+        createdAt:         string;
+        updatedAt:         string;
+        info:              Record<string, string>;
     };
     settings?:     Record<string, any>;
     permalinkMap?: Record<string, string>;
@@ -202,6 +204,9 @@ export default function ProductCategoryLayout1({
     const activeBox   = pageData?.activeBox       ?? null;
     const attrOptions = pageData?.attributeOptions ?? [];
 
+    const shortDescription = data.info?.shortDescription || data.info?.short_description || data.shortDescription || '';
+    const description      = data.description || data.info?.description || '';
+
     // ── Settings flags ────────────────────────────────────────────────────────
     const filterEnabled = settings.product_cat_filter_enabled !== '0';
     const priceFilter   = settings.product_cat_price_filter   !== '0';
@@ -268,7 +273,7 @@ export default function ProductCategoryLayout1({
 
             {/* ── Banner ── */}
             <header
-                className="relative bg-linear-to-r from-emerald-600 to-teal-600 py-12 px-6 overflow-hidden"
+                className="relative bg-main py-12 overflow-hidden"
                 style={catImage ? {
                     backgroundImage:    `url(${catImage})`,
                     backgroundSize:     'cover',
@@ -293,14 +298,15 @@ export default function ProductCategoryLayout1({
                     <h1 className="text-3xl sm:text-4xl font-extrabold text-white capitalize leading-tight">
                         {data.title}
                     </h1>
+                    {shortDescription && (
+                        <div
+                            className="text-white/90 text-sm sm:text-base mt-2 max-w-3xl leading-relaxed"
+                            dangerouslySetInnerHTML={{ __html: shortDescription }}
+                        />
+                    )}
                     <div className="flex items-center gap-3 mt-3 flex-wrap">
                         <span className="text-white/70 text-sm">
                             {allProducts.length} product{allProducts.length !== 1 ? 's' : ''}
-                        </span>
-                        <span className={`text-xs font-semibold px-3 py-1 rounded-full capitalize ${
-                            data.status === 'published' ? 'bg-white text-emerald-700' : 'bg-white/20 text-white'
-                        }`}>
-                            {data.status}
                         </span>
                     </div>
                 </div>
@@ -340,7 +346,18 @@ export default function ProductCategoryLayout1({
                 >
                     {cardGrid}
                 </ProductGridClient>
+
+                {/* Category Description (Bottom) */}
+                {description && (
+                    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 md:p-8 mt-8">
+                        <div
+                            className="prose max-w-none text-gray-700 description"
+                            dangerouslySetInnerHTML={{ __html: description }}
+                        />
+                    </div>
+                )}
             </div>
         </main>
     );
 }
+
