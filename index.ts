@@ -165,6 +165,22 @@ export function register() {
     // ─── Product post form fields ───────────────────────────────────────────
     addHook("post.form", [
         {
+            key: "shortDescription",
+            label: "Short Description",
+            type: "product",
+            style: "left",
+            position: 5,
+            fieldType: "content",
+        },
+        {
+            key: "description",
+            label: "Description",
+            type: "product",
+            style: "left",
+            position: 7,
+            fieldType: "content",
+        },
+        {
             key: "_variate",
             label: "Pricing & Stock",
             type: "product",
@@ -234,14 +250,6 @@ export function register() {
             style: "right",
             position: 70,
             component: Text,
-        },
-        {
-            key: "shortDescription",
-            label: "Short Description",
-            type: "product",
-            style: "left",
-            position: 5,
-            component: Textarea,
         },
         {
             key: "orderNote",
