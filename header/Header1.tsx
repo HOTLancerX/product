@@ -44,7 +44,7 @@ export default function Header4({
                 {/* Mobile: cart + hamburger */}
                 <div className="flex items-center gap-1 md:hidden ml-auto">
                     <CartButton fontSize={22} color="#374151" />
-                    <MobileDrawer items={mobileItems} siteName={settings.siteName} iconColor="#374151" />
+                    <MobileDrawer items={mobileItems} settings={settings} iconColor="#374151" />
                 </div>
 
                 {/* Main nav */}
