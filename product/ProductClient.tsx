@@ -530,7 +530,7 @@ function Layout1Shell(props: ShellProps) {
 
     return (
         <div className="container my-8">
-            <div className="grid grid-cols-1 md:grid-cols-3 md:items-start gap-6 bg-white p-3 md:p-6 rounded-2xl">
+            <div className="grid grid-cols-1 md:grid-cols-2 md:items-start gap-6 bg-white p-3 md:p-6 rounded-2xl">
 
                 {/* ── Image column ── */}
                 <div className="w-full md:sticky md:top-4">
@@ -538,7 +538,7 @@ function Layout1Shell(props: ShellProps) {
                 </div>
 
                 {/* ── Info column ── */}
-                <div className="md:col-span-2 flex flex-col gap-4">
+                <div className="flex flex-col gap-4">
                     {/* Category breadcrumb */}
                     {categoryLinks.length > 0 && (
                         <nav aria-label="Category breadcrumb"

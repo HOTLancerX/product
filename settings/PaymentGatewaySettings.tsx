@@ -119,7 +119,7 @@ export default function PaymentGatewaySettings({ initialValues = {} }: Props) {
                         {/* Card header row */}
                         <div className="flex items-center gap-3 px-4 py-3">
                             <div className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center shrink-0">
-                                <Icon icon={gw.icon || "mdi:credit-card-outline"} width={18} className="text-emerald-600" />
+                                <Icon icon={gw.icon || "mdi:credit-card-outline"} width={18} className="text-main" />
                             </div>
                             <div className="flex-1 min-w-0">
                                 <p className="text-sm font-semibold text-gray-800 truncate">{gw.label || "Unnamed gateway"}</p>
@@ -130,10 +130,10 @@ export default function PaymentGatewaySettings({ initialValues = {} }: Props) {
                                 <button
                                     type="button"
                                     onClick={() => updateGateway(idx, { enabled: !gw.enabled })}
-                                    className={`w-9 h-5 rounded-full transition-colors relative ${gw.enabled ? "bg-emerald-500" : "bg-gray-200"}`}
+                                    className={`w-9 h-5 rounded-full transition-colors relative ${gw.enabled ? "bg-main" : "bg-gray-200"}`}
                                     aria-label={gw.enabled ? "Disable" : "Enable"}
                                 >
-                                    <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${gw.enabled ? "translate-x-4" : "translate-x-0.5"}`} />
+                                    <span className={`absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform duration-200 ${gw.enabled ? "translate-x-full" : ""}`} />
                                 </button>
                                 {/* Edit toggle */}
                                 <button

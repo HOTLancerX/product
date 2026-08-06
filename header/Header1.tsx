@@ -37,8 +37,12 @@ export default function Header4({
 
             <div className="container h-16 flex items-center justify-between w-full gap-6">
                 {/* Logo */}
-                <Link href="/" className="text-xl font-extrabold text-gray-900 tracking-tight shrink-0">
-                    {settings.siteName || 'MySite'}
+                <Link href="/" className="text-xl font-extrabold text-gray-900 tracking-tight shrink-0 flex items-center">
+                    {settings.logo ? (
+                        <img src={settings.logo} alt={settings.siteName} className="h-10 md:h-14 w-auto object-contain" />
+                    ) : (
+                        settings.siteName
+                    )}
                 </Link>
 
                 {/* Mobile: cart + hamburger */}

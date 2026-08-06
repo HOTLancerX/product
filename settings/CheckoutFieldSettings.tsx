@@ -132,7 +132,7 @@ export default function CheckoutFieldSettings({ initialValues = {} }: Props) {
                 {fields.map((field, idx) => (
                     <div
                         key={field.key}
-                        className={`grid grid-cols-1 md:grid-cols-[1.5rem_1fr_6rem_6rem_5rem_5rem_3rem] gap-2 items-center bg-white border rounded-xl px-3 py-3 shadow-sm transition ${
+                        className={`grid grid-cols-1 lg:grid-cols-[1.5rem_1fr_6rem_6rem_5rem_5rem_3rem] gap-2 items-center bg-white border rounded-xl px-3 py-3 shadow-sm transition ${
                             field.status ? "border-gray-200" : "border-gray-100 opacity-60"
                         }`}
                     >
@@ -173,12 +173,12 @@ export default function CheckoutFieldSettings({ initialValues = {} }: Props) {
                                 type="button"
                                 onClick={() => update(idx, { required: !field.required })}
                                 className={`w-9 h-5 rounded-full transition-colors relative ${
-                                    field.required ? "bg-emerald-500" : "bg-gray-200"
+                                    field.required ? "bg-main" : "bg-gray-200"
                                 }`}
                                 aria-label={`${field.required ? "Disable" : "Enable"} required for ${field.name}`}
                             >
-                                <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${
-                                    field.required ? "translate-x-4" : "translate-x-0.5"
+                                <span className={`absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform duration-200 ${
+                                    field.required ? "translate-x-full" : ""
                                 }`} />
                             </button>
                         </div>
@@ -189,13 +189,15 @@ export default function CheckoutFieldSettings({ initialValues = {} }: Props) {
                                 type="button"
                                 onClick={() => update(idx, { status: !field.status })}
                                 className={`w-9 h-5 rounded-full transition-colors relative ${
-                                    field.status ? "bg-emerald-500" : "bg-gray-200"
+                                    field.status ? "bg-main" : "bg-gray-200"
                                 }`}
                                 aria-label={`${field.status ? "Hide" : "Show"} ${field.name}`}
                             >
-                                <span className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${
-                                    field.status ? "translate-x-4" : "translate-x-0.5"
-                                }`} />
+                                <span
+                                    className={`absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white shadow transition-transform duration-200 ${
+                                        field.status ? "translate-x-full" : ""
+                                    }`}
+                                />
                             </button>
                         </div>
 
