@@ -39,9 +39,20 @@ export default function Header4({
                 {/* Logo */}
                 <Link href="/" className="text-xl font-extrabold text-gray-900 tracking-tight shrink-0 flex items-center">
                     {settings.logo ? (
-                        <img src={settings.logo} alt={settings.siteName} className="h-10 md:h-14 w-auto object-contain" />
+                        <img
+                            src={settings.logo}
+                            alt={settings.siteName || 'NxCMS'}
+                            className={settings.header_logo_height || settings.headerLogoHeight ? "w-auto object-contain" : "h-8 w-auto object-contain"}
+                            style={{
+                                height: settings.header_logo_height
+                                    ? `${settings.header_logo_height}px`
+                                    : settings.headerLogoHeight
+                                    ? `${settings.headerLogoHeight}px`
+                                    : undefined,
+                            }}
+                        />
                     ) : (
-                        settings.siteName
+                        settings.siteName || 'NxCMS'
                     )}
                 </Link>
 
