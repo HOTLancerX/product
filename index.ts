@@ -36,7 +36,7 @@ import Header4 from "./header/Header1";
 
 // ─── Plugin metadata ───────────────────────────────────────────────────────────
 export const PLUGINS: PluginMeta = {
-    nx: "com.system.product",
+    nx: "product",
     name: "product",
     version: "1.0.0",
     description: "E-commerce product post type with price, SKU, and stock fields.",
@@ -67,18 +67,18 @@ export function register() {
     // ─── Register lazy page components ───────────────────────────────────────
     // These are registered once per register() call (dedup is inside
     // registerLazyComponent — last write wins on re-register / hot-reload).
-    registerLazyComponent("product.CheckoutPage",          () => import("./checkout/page"),           PLUGINS.nx);
+    registerLazyComponent("product.CheckoutPage", () => import("./checkout/page"), PLUGINS.nx);
     registerLazyComponent("product.OrderConfirmationPage", () => import("./order-confirmation/page"), PLUGINS.nx);
-    registerLazyComponent("product.AdminOrdersPage",       () => import("./orders/page"),             PLUGINS.nx);
-    registerLazyComponent("product.AdminOrderDetailPage",  () => import("./orders/details"),          PLUGINS.nx);
-    registerLazyComponent("product.PendingOrdersPage",     () => import("./orders/pending/page"),     PLUGINS.nx);
-    registerLazyComponent("product.ProcessingOrdersPage",  () => import("./orders/processing/page"),  PLUGINS.nx);
-    registerLazyComponent("product.ShippedOrdersPage",     () => import("./orders/shipped/page"),     PLUGINS.nx);
-    registerLazyComponent("product.DeliveredOrdersPage",   () => import("./orders/delivered/page"),   PLUGINS.nx);
-    registerLazyComponent("product.CancelledOrdersPage",   () => import("./orders/cancelled/page"),   PLUGINS.nx);
-    registerLazyComponent("product.ReturnManager",         () => import("./orders/ReturnManager"),    PLUGINS.nx);
-    registerLazyComponent("product.UserOrderList",         () => import("./users/orderlist"),         PLUGINS.nx);
-    registerLazyComponent("product.UserOrderDetails",      () => import("./users/orderdetails"),      PLUGINS.nx);
+    registerLazyComponent("product.AdminOrdersPage", () => import("./orders/page"), PLUGINS.nx);
+    registerLazyComponent("product.AdminOrderDetailPage", () => import("./orders/details"), PLUGINS.nx);
+    registerLazyComponent("product.PendingOrdersPage", () => import("./orders/pending/page"), PLUGINS.nx);
+    registerLazyComponent("product.ProcessingOrdersPage", () => import("./orders/processing/page"), PLUGINS.nx);
+    registerLazyComponent("product.ShippedOrdersPage", () => import("./orders/shipped/page"), PLUGINS.nx);
+    registerLazyComponent("product.DeliveredOrdersPage", () => import("./orders/delivered/page"), PLUGINS.nx);
+    registerLazyComponent("product.CancelledOrdersPage", () => import("./orders/cancelled/page"), PLUGINS.nx);
+    registerLazyComponent("product.ReturnManager", () => import("./orders/ReturnManager"), PLUGINS.nx);
+    registerLazyComponent("product.UserOrderList", () => import("./users/orderlist"), PLUGINS.nx);
+    registerLazyComponent("product.UserOrderDetails", () => import("./users/orderdetails"), PLUGINS.nx);
     // ─── Register post & category types ────────────────────────────────────
     addPostType([
         {
@@ -818,11 +818,11 @@ export function register() {
     // ─── User account nav items ─────────────────────────────────────────────
     addHook("user.nav", [
         {
-            key:      "user-orders",
-            label:    "My Orders",
-            icon:     "solar:bag-bold",
-            slug:     "orders",
-            parent:   "",
+            key: "user-orders",
+            label: "My Orders",
+            icon: "solar:bag-bold",
+            slug: "orders",
+            parent: "",
             position: 2,
         },
     ], PLUGINS.nx);
@@ -832,18 +832,18 @@ export function register() {
     // URL: /account/orders/<_id>    → order detail (prefix match)
     addHook("user.page", [
         {
-            key:      "orders",
-            label:    "My Orders",
-            type:     "user-orders",
-            style:    "left",
+            key: "orders",
+            label: "My Orders",
+            type: "user-orders",
+            style: "left",
             position: 10,
             lazyPath: "product.UserOrderList",
         },
         {
-            key:      "orders/",
-            label:    "Order Detail",
-            type:     "user-orders",
-            style:    "left",
+            key: "orders/",
+            label: "Order Detail",
+            type: "user-orders",
+            style: "left",
             position: 11,
             lazyPath: "product.UserOrderDetails",
         },
