@@ -33,6 +33,7 @@ import ProductSettingsPage from "./settings/ProductSettingsPage";
 import ProductBox1 from "./box/Product-1";
 import ProductBox2 from "./box/Product-2";
 import Header4 from "./header/Header1";
+import ProductImportPage from "./admin/ImportPage";
 
 // ─── Plugin metadata ───────────────────────────────────────────────────────────
 export const PLUGINS: PluginMeta = {
@@ -160,6 +161,14 @@ export function register() {
             parent: "product",
             position: 5,
         },
+        {
+            key: "product-import",
+            label: "Bulk Import",
+            icon: "solar:cloud-upload-bold",
+            slug: "product/import",
+            parent: "product",
+            position: 6,
+        },
     ], PLUGINS.nx);
 
     // ─── Product post form fields ───────────────────────────────────────────
@@ -220,6 +229,14 @@ export function register() {
             type: "product",
             style: "right",
             position: 30,
+            component: Text,
+        },
+        {
+            key: "unit",
+            label: "Unit (e.g. pcs, kg, box)",
+            type: "product",
+            style: "right",
+            position: 35,
             component: Text,
         },
         {
@@ -605,6 +622,13 @@ export function register() {
             style: "left",
             position: 20,
             path: ProductSettingsPage,
+        },
+        {
+            key: "product/import",
+            label: "Bulk Import Products",
+            style: "left",
+            position: 25,
+            path: ProductImportPage,
         },
     ], PLUGINS.nx);
 
