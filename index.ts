@@ -414,7 +414,7 @@ export function register() {
             slug: "dynamic",
             style: "left",
             position: 20,
-            active: false,
+            active: true,
             component: ProductLayout2,
         },
         {
@@ -448,7 +448,7 @@ export function register() {
             slug: "dynamic",
             style: "left",
             position: 20,
-            active: false,
+            active: true,
             component: ProductCategoryLayout2,
         },
     ], PLUGINS.nx);
@@ -474,7 +474,7 @@ export function register() {
             slug: "dynamic",
             style: "left",
             position: 20,
-            active: false,
+            active: true,
             component: ProductBox2,
         },
     ], PLUGINS.nx);

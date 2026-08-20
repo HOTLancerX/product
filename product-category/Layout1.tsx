@@ -207,13 +207,35 @@ export default function ProductCategoryLayout1({
     const shortDescription = data.info?.shortDescription || data.info?.short_description || data.shortDescription || '';
     const description      = data.description || data.info?.description || '';
 
-    // ── Settings flags ────────────────────────────────────────────────────────
-    const filterEnabled = settings.product_cat_filter_enabled !== '0';
-    const priceFilter   = settings.product_cat_price_filter   !== '0';
-    const sortEnabled   = settings.product_cat_sort_enabled   !== '0';
-    const rawStyle      = parseInt(String(settings.product_cat_filter_style ?? '1'), 10);
-    const filterStyle   = ([1, 2, 3, 4].includes(rawStyle) ? rawStyle : 1) as 1 | 2 | 3 | 4;
-    const hasFilters    = filterEnabled && (attrOptions.length > 0 || priceFilter);
+    // ── Dynamic Settings & Category Info Flags ───────────────────────────────
+    const filterEnabled =
+        data.info?.filter_enabled !== '0' &&
+        data.info?.filter_disabled !== '1' &&
+        settings.category_filter_enabled !== '0' &&
+        settings.product_cat_filter_enabled !== '0';
+
+    const priceFilter =
+        data.info?.price_filter !== '0' &&
+        settings.category_price_filter !== '0' &&
+        settings.product_cat_price_filter !== '0';
+
+    const sortEnabled =
+        data.info?.sort_enabled !== '0' &&
+        data.info?.sort_disabled !== '1' &&
+        settings.category_sort_enabled !== '0' &&
+        settings.product_cat_sort_enabled !== '0';
+
+    const rawStyle = parseInt(
+        String(
+            data.info?.filter_style ??
+            settings.category_filter_style ??
+            settings.product_cat_filter_style ??
+            '1'
+        ),
+        10
+    );
+    const filterStyle = ([1, 2, 3, 4].includes(rawStyle) ? rawStyle : 1) as 1 | 2 | 3 | 4;
+    const hasFilters = filterEnabled && (attrOptions.length > 0 || priceFilter);
 
     // ── Parse search params & apply filters server-side ───────────────────────
     const { activeFilters, minPrice, maxPrice, currentSort } = parseParams(searchParams);
@@ -233,6 +255,17 @@ export default function ProductCategoryLayout1({
     // category field (shouldn't happen, but defensive).
     const currentCatId = data._id;
 
+    // ── Dynamic Grid Columns & Gaps from Admin Settings ───────────────────────
+    const mobColsClass  = Number(settings.category_grid_cols_mobile)  || 2;
+    const tabColsClass  = Number(settings.category_grid_cols_tablet)  || 3;
+    const deskColsClass = Number(settings.category_grid_cols_desktop) || 4;
+
+    const mobGapClass  = `gap-${settings.category_grid_gap_mobile != null && settings.category_grid_gap_mobile !== '' ? Number(settings.category_grid_gap_mobile) : 4}`;
+    const tabGapClass  = `md:gap-${settings.category_grid_gap_tablet != null && settings.category_grid_gap_tablet !== '' ? Number(settings.category_grid_gap_tablet) : 4}`;
+    const deskGapClass = `lg:gap-${settings.category_grid_gap_desktop != null && settings.category_grid_gap_desktop !== '' ? Number(settings.category_grid_gap_desktop) : 5}`;
+
+    const gridClass = `grid grid-cols-${mobColsClass} md:grid-cols-${tabColsClass} lg:grid-cols-${deskColsClass} ${mobGapClass} ${tabGapClass} ${deskGapClass} w-full`;
+
     // ── Render product cards (pure server JSX) ────────────────────────────────
     const cardGrid = products.length === 0 ? (
         <div className="text-center py-20 text-gray-400">
@@ -244,7 +277,7 @@ export default function ProductCategoryLayout1({
             </p>
         </div>
     ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-5">
+        <div className={gridClass}>
             {products.map((product) =>
                 BoxComponent ? (
                     <BoxComponent
@@ -329,23 +362,27 @@ export default function ProductCategoryLayout1({
                     </nav>
                 )}
 
-                {/* Client shell — wraps server-rendered cards with filter/sort UI */}
-                <ProductGridClient
-                    totalProducts={allProducts.length}
-                    filteredCount={products.length}
-                    hasFilters={hasFilters}
-                    filterStyle={filterStyle}
-                    attributeOptions={attrOptions}
-                    showPriceFilter={priceFilter}
-                    showSort={sortEnabled}
-                    theme="light"
-                    activeFilters={activeFilters}
-                    minPrice={minPrice}
-                    maxPrice={maxPrice}
-                    currentSort={currentSort}
-                >
-                    {cardGrid}
-                </ProductGridClient>
+                {/* Client shell — wraps server-rendered cards with filter/sort UI when enabled */}
+                {hasFilters || sortEnabled ? (
+                    <ProductGridClient
+                        totalProducts={allProducts.length}
+                        filteredCount={products.length}
+                        hasFilters={hasFilters}
+                        filterStyle={filterStyle}
+                        attributeOptions={attrOptions}
+                        showPriceFilter={priceFilter}
+                        showSort={sortEnabled}
+                        theme="light"
+                        activeFilters={activeFilters}
+                        minPrice={minPrice}
+                        maxPrice={maxPrice}
+                        currentSort={currentSort}
+                    >
+                        {cardGrid}
+                    </ProductGridClient>
+                ) : (
+                    cardGrid
+                )}
 
                 {/* Category Description (Bottom) */}
                 {description && (
