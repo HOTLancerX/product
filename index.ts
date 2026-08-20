@@ -33,6 +33,7 @@ import ProductSettingsPage from "./settings/ProductSettingsPage";
 import ProductBox1 from "./box/Product-1";
 import ProductBox2 from "./box/Product-2";
 import Header4 from "./header/Header1";
+import Header2 from "./header/Header2";
 import ProductImportPage from "./admin/ImportPage";
 
 // ─── Plugin metadata ───────────────────────────────────────────────────────────
@@ -424,8 +425,18 @@ export function register() {
             slug: "layout",
             style: "left",
             position: 10,
-            active: true,           // first-boot default
+            active: false,
             component: Header4,
+        },
+        {
+            key: "header",
+            label: "Header Layout 6 (Top-Up / SEAGM Style)",
+            type: "header",
+            slug: "layout",
+            style: "left",
+            position: 15,
+            active: true,
+            component: Header2,
         },
     ], PLUGINS.nx);
 
