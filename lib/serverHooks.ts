@@ -79,7 +79,7 @@ registerServerDataHook("product", async (id, _slug, data) => {
     if (categoryId) {
         try {
             const settingsObj = await Settings();
-            const limit = parseInt(settingsObj?.related_products_total as string ?? "12", 10) || 12;
+            const limit = Math.max(36, parseInt((settingsObj?.related_products_total as string) ?? "36", 10) || 36);
 
             const catPosts = await Post.find({
                 category: categoryId,

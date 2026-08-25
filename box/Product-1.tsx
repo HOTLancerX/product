@@ -82,6 +82,8 @@ export default function ProductBox1({
     flashSaleCampaign,
 }: ProductBoxProps) {
     const { resolvePrice } = useFlashSale();
+    const slug = data?.slug || String(data?._id || '');
+    const finalProductUrl = productUrl || `/product/${slug}`;
 
     const variate   = parseJson<Record<string, any>>(data.info?._variate, {});
     const priceType = (variate.priceType ?? 'single') as 'single' | 'variant';
@@ -205,7 +207,7 @@ export default function ProductBox1({
                 )}
 
                 {/* Image */}
-                <Link href={productUrl} className="block aspect-square overflow-hidden bg-gray-50" tabIndex={-1}>
+                <Link href={finalProductUrl} className="block aspect-square overflow-hidden bg-gray-50" tabIndex={-1}>
                     {img ? (
                         <Image
                             src={img}
@@ -226,7 +228,7 @@ export default function ProductBox1({
 
                     {/* Title */}
                     <Link
-                        href={productUrl}
+                        href={finalProductUrl}
                         className="text-sm font-semibold text-gray-900 hover:text-main transition-colors line-clamp-2 leading-snug"
                     >
                         {data.title}
