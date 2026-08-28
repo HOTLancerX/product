@@ -13,6 +13,8 @@ import Link from "next/link";
 import Image from "next/image";
 import { Icon } from "@iconify/react";
 import useSettings from "@/lib/useSettings";
+import { getHooks, type FormHooks } from "@/hook";
+import { reregisterHooks } from "@/hook/PluginList";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -64,6 +66,18 @@ interface Order {
     notes?: string;
     timeline: TimelineEntry[];
     metadata?: { ipAddress?: string; device?: string; browser?: string; os?: string };
+    courier?: {
+        provider?: string;
+        consignmentId?: string;
+        trackingCode?: string;
+        invoice?: string;
+        status?: string;
+        statusDetail?: string;
+        deliveryFee?: number;
+        lastSyncAt?: string;
+        logs?: Array<{ date: string; status: string; note: string }>;
+        [key: string]: any;
+    };
     inventoryUpdated: boolean;
     createdAt: string;
     updatedAt: string;
@@ -159,8 +173,21 @@ export default function AdminOrderDetailPage() {
     const [saving,     setSaving]     = useState(false);
     const [saveMsg,    setSaveMsg]    = useState("");
     const [locationMap, setLocationMap] = useState<Record<string, string>>({});
+    const [courierHooks, setCourierHooks] = useState<FormHooks>([]);
     const { settings } = useSettings();
     const currency = (settings?.product_currency_symbol || settings?.currency_symbol || "") as string;
+
+    // ── Load active plugins and courier hooks ────────────────────────────────
+    useEffect(() => {
+        fetch("/api/admin-init", { cache: "no-store" })
+            .then((r) => r.json())
+            .then((data: { plugins: { nx: string; status: string }[] }) => {
+                const ids = (data.plugins ?? []).filter((p) => p.status === "active").map((p) => p.nx);
+                reregisterHooks(ids);
+                setCourierHooks(getHooks("order.detail.courier"));
+            })
+            .catch(() => {});
+    }, []);
 
     // ── Fetch order by _id ────────────────────────────────────────────────────
 
@@ -461,6 +488,71 @@ export default function AdminOrderDetailPage() {
 
                 {/* ── Right sidebar ── */}
                 <div className="space-y-6">
+
+                    {/* Active Courier Integration Cards (Hook-injected) */}
+                    {courierHooks.map((h) => {
+                        const Component = h.component || h.path;
+                        if (!Component) return null;
+                        return (
+                            <Component
+                                key={h.key}
+                                order={order}
+                                refresh={fetchOrder}
+                            />
+                        );
+                    })}
+
+                    {/* Courier Information Card if booked */}
+                    {order.courier && order.courier.provider && (
+                        <Card title="Courier Dispatch" icon="solar:box-bold">
+                            <div className="space-y-3 text-sm">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-gray-500 font-medium">Provider</span>
+                                    <span className="font-bold uppercase px-2.5 py-0.5 rounded-full text-xs bg-indigo-50 text-indigo-700 border border-indigo-200">
+                                        {order.courier.provider}
+                                    </span>
+                                </div>
+                                {order.courier.consignmentId && (
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-gray-500 font-medium">Consignment ID</span>
+                                        <span className="font-mono text-xs font-semibold text-gray-800 bg-gray-50 px-2 py-1 rounded border border-gray-200">
+                                            {order.courier.consignmentId}
+                                        </span>
+                                    </div>
+                                )}
+                                {order.courier.trackingCode && (
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-gray-500 font-medium">Tracking Code</span>
+                                        <span className="font-mono text-xs font-semibold text-gray-800 bg-gray-50 px-2 py-1 rounded border border-gray-200">
+                                            {order.courier.trackingCode}
+                                        </span>
+                                    </div>
+                                )}
+                                {order.courier.status && (
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-gray-500 font-medium">Delivery Status</span>
+                                        <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full capitalize bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                            {order.courier.status}
+                                        </span>
+                                    </div>
+                                )}
+                                {order.courier.deliveryFee != null && (
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-gray-500 font-medium">Courier Fee</span>
+                                        <span className="font-semibold text-gray-800">
+                                            {currency} {order.courier.deliveryFee}
+                                        </span>
+                                    </div>
+                                )}
+                                {order.courier.lastSyncAt && (
+                                    <div className="text-[11px] text-gray-400 pt-1 border-t border-gray-100 flex items-center justify-between">
+                                        <span>Last synced</span>
+                                        <span>{fmtDate(order.courier.lastSyncAt)}</span>
+                                    </div>
+                                )}
+                            </div>
+                        </Card>
+                    )}
 
                     {/* Update */}
                     <Card title="Update Order" icon="mdi:pencil-outline">

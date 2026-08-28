@@ -131,10 +131,17 @@ export async function PUT(
             { $set, $push: { timeline: timelineEntry } } as any
         );
 
-        // ── Fire action hooks on delivery ─────────────────────────────────
-        // When an order transitions to "delivered", broadcast the event so any
-        // active plugin can respond (seller commission credit, membership
-        // activation, loyalty points, etc.) — zero direct imports needed.
+        // ── Fire action hooks on status change & delivery ─────────────────
+        if (status && status !== order.status) {
+            await doAction('order.status_changed', {
+                order,
+                orderNumber,
+                previousStatus: order.status,
+                newStatus: status,
+                now,
+            });
+        }
+
         const transitioningToDelivered =
             status === 'delivered' && order.status !== 'delivered';
 

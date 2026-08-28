@@ -18,6 +18,12 @@ interface Order {
     shippingAddress: { name: string; phone: string; email: string };
     items: OrderItem[];
     total: number;
+    courier?: {
+        provider?: string;
+        consignmentId?: string;
+        trackingCode?: string;
+        status?: string;
+    };
     createdAt: string;
 }
 
@@ -121,7 +127,7 @@ export default function OrdersTable({
 
             {/* Filters */}
             <div className="flex flex-wrap gap-3 items-center">
-                <div className="relative flex-1 min-w-[200px] max-w-sm">
+                <div className="relative flex-1 min-w-50 max-w-sm">
                     <Icon icon="solar:magnifer-linear" width={16}
                         className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
                     <input
@@ -211,11 +217,17 @@ export default function OrdersTable({
                             {orders.map(order => (
                                 <tr key={order._id} className="hover:bg-gray-50 transition-colors">
                                     <td className="px-5 py-3 font-mono text-xs font-semibold text-gray-800">
-                                        {order.orderNumber}
+                                        <div>{order.orderNumber}</div>
+                                        {order.courier?.provider && (
+                                            <span className="inline-flex items-center gap-1 mt-1 px-1.5 py-0.5 rounded text-[10px] font-sans font-medium uppercase bg-indigo-50 text-indigo-700 border border-indigo-200">
+                                                <Icon icon="solar:box-bold" width={10} />
+                                                {order.courier.provider}
+                                            </span>
+                                        )}
                                     </td>
                                     <td className="px-5 py-3">
-                                        <p className="font-medium text-gray-800 truncate max-w-[140px]">{order.shippingAddress?.name ?? "—"}</p>
-                                        <p className="text-xs text-gray-400 truncate max-w-[140px]">{order.shippingAddress?.phone ?? ""}</p>
+                                        <p className="font-medium text-gray-800 truncate max-w-35">{order.shippingAddress?.name ?? "—"}</p>
+                                        <p className="text-xs text-gray-400 truncate max-w-35">{order.shippingAddress?.phone ?? ""}</p>
                                     </td>
                                     <td className="px-5 py-3 text-gray-500">
                                         {order.items.length} item{order.items.length !== 1 ? "s" : ""}

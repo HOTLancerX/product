@@ -6,6 +6,8 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { Icon } from '@iconify/react';
 import useSettings from '@/lib/useSettings';
+import { getHooks, type FormHooks } from '@/hook';
+import { reregisterHooks } from '@/hook/PluginList';
 
 interface OrderItem {
     productId: string;
@@ -40,6 +42,17 @@ interface Order {
     subtotal: number;
     total: number;
     notes?: string;
+    courier?: {
+        provider?: string;
+        consignmentId?: string;
+        trackingCode?: string;
+        status?: string;
+        statusDetail?: string;
+        deliveryFee?: number;
+        lastSyncAt?: string;
+        logs?: Array<{ date: string; status: string; note: string }>;
+        [key: string]: any;
+    };
     createdAt: string;
 }
 
@@ -76,6 +89,18 @@ export default function OrderConfirmationPage() {
     const [order, setOrder] = useState<Order | null>(null);
     const [loading, setLoading] = useState(true);
     const [notFound, setNotFound] = useState(false);
+    const [trackingHooks, setTrackingHooks] = useState<FormHooks>([]);
+
+    useEffect(() => {
+        fetch("/api/plugin", { cache: "no-store" })
+            .then((r) => r.json())
+            .then((data: { nx: string; status: string }[]) => {
+                const ids = (data ?? []).filter((p) => p.status === "active").map((p) => p.nx);
+                reregisterHooks(ids);
+                setTrackingHooks(getHooks("order.confirmation.tracking"));
+            })
+            .catch(() => {});
+    }, []);
 
     useEffect(() => {
         if (!orderNumber) return;
@@ -144,6 +169,46 @@ export default function OrderConfirmationPage() {
                     </span>
                 </div>
             </div>
+
+            {/* ── Courier Live Tracking (if present or hooked) ── */}
+            {order.courier && order.courier.provider && (
+                <div className="bg-white rounded-2xl shadow-sm border border-indigo-100 p-6 mb-6">
+                    <div className="flex items-center justify-between pb-3 border-b border-gray-100 mb-4">
+                        <div className="flex items-center gap-2">
+                            <Icon icon="solar:box-bold" width={20} className="text-indigo-600" />
+                            <h2 className="text-sm font-bold text-gray-900">Shipment & Delivery Tracking</h2>
+                        </div>
+                        <span className="text-xs uppercase font-bold px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
+                            {order.courier.provider}
+                        </span>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
+                        {order.courier.consignmentId && (
+                            <div>
+                                <span className="text-xs text-gray-400 block">Consignment ID</span>
+                                <span className="font-mono font-semibold text-gray-800">{order.courier.consignmentId}</span>
+                            </div>
+                        )}
+                        {order.courier.trackingCode && (
+                            <div>
+                                <span className="text-xs text-gray-400 block">Tracking Code</span>
+                                <span className="font-mono font-semibold text-gray-800">{order.courier.trackingCode}</span>
+                            </div>
+                        )}
+                        {order.courier.status && (
+                            <div>
+                                <span className="text-xs text-gray-400 block">Live Status</span>
+                                <span className="font-semibold text-emerald-600 capitalize">{order.courier.status}</span>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {trackingHooks.map((h) => {
+                const Component = h.component || h.path;
+                return Component ? <Component key={h.key} order={order} /> : null;
+            })}
 
             {/* ── Order items ── */}
             <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6">

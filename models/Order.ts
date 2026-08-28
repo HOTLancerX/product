@@ -68,7 +68,20 @@ export interface Order {
     };
 
     timeline: OrderTimeline[];
-    metadata?: OrderMetadata;
+    metadata?: OrderMetadata & Record<string, any>;
+
+    courier?: {
+        provider?: 'pathao' | 'steadfast' | 'ecourier' | 'paperfly' | 'redx' | string;
+        consignmentId?: string;
+        trackingCode?: string;
+        invoice?: string;
+        status?: string;
+        statusDetail?: string;
+        deliveryFee?: number;
+        lastSyncAt?: Date | string;
+        logs?: Array<{ date: Date | string; status: string; note: string }>;
+        [key: string]: any;
+    };
 
     notes?: string;
 
