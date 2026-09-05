@@ -1,12 +1,13 @@
 /**
- * Product Category Layout 2 — Dark minimal style. Fully server-rendered.
+ * Product Category Layout 2 — Modern Minimalist Style (White & Black Theme). Fully server-rendered.
  *
- * Identical data pipeline to Layout1 — resolves box component server-side,
- * applies filters/sort from searchParams, renders cards in server JSX.
- * No useActivePlugins, no loading skeleton.
+ * Background: Pure clean white
+ * Typography: Sleek, high-contrast black/dark gray
+ * Fully dynamic: Admin settings, grid columns/gaps, filters, sorting, breadcrumbs, and active product-box components.
  */
 
 import Link from 'next/link';
+import { Icon } from '@iconify/react';
 import { getAllRootPages } from '@/hook';
 import type { CategoryPageData, CategoryProduct } from '@/plugin/product/lib/types';
 import ProductGridClient from './ProductGridClient';
@@ -238,12 +239,17 @@ export default function ProductCategoryLayout2({
     const gridClass = `grid grid-cols-${mobColsClass} md:grid-cols-${tabColsClass} lg:grid-cols-${deskColsClass} ${mobGapClass} ${tabGapClass} ${deskGapClass} w-full`;
 
     const cardGrid = products.length === 0 ? (
-        <div className="text-center py-20 text-white/40">
-            <p className="text-4xl mb-4">🛍️</p>
-            <p className="text-lg font-medium">
+        <div className="text-center py-20 text-gray-500 bg-gray-50/60 rounded-2xl border border-gray-100 p-8">
+            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gray-100 flex items-center justify-center text-gray-400">
+                <Icon icon="solar:bag-3-linear" width={32} />
+            </div>
+            <p className="text-lg font-semibold text-gray-900">
                 {Object.keys(activeFilters).length > 0 || minPrice !== undefined || maxPrice !== undefined
                     ? 'No products match your filters.'
                     : 'No products in this category yet.'}
+            </p>
+            <p className="text-sm text-gray-500 mt-1 max-w-sm mx-auto">
+                Try removing some filters to view more available products.
             </p>
         </div>
     ) : (
@@ -260,11 +266,14 @@ export default function ProductCategoryLayout2({
                     <Link
                         key={product._id}
                         href={buildUrl(productPrefix, product.slug)}
-                        className="bg-white/5 border border-white/10 rounded-2xl shadow-sm hover:border-emerald-500/30 transition-shadow p-4"
+                        className="bg-white rounded-xl border border-gray-200 shadow-2xs hover:border-black hover:shadow-md transition-all p-4 flex flex-col justify-between"
                     >
-                        <p className="text-sm font-semibold text-white/90 line-clamp-2">
+                        <p className="text-sm font-semibold text-gray-950 line-clamp-2 leading-snug">
                             {product.title}
                         </p>
+                        <span className="text-xs font-semibold text-gray-500 mt-3 inline-flex items-center gap-1">
+                            Explore <Icon icon="solar:arrow-right-linear" width={12} />
+                        </span>
                     </Link>
                 )
             )}
@@ -272,66 +281,120 @@ export default function ProductCategoryLayout2({
     );
 
     return (
-        <main className="min-h-screen bg-[#0a0c10]">
+        <main className="min-h-screen bg-white text-gray-950 antialiased">
 
-            {/* ── Banner ── */}
-            <header
-                className="relative py-16 px-6 overflow-hidden"
-                style={catImage ? {
-                    backgroundImage:    `url(${catImage})`,
-                    backgroundSize:     'cover',
-                    backgroundPosition: 'center',
-                } : undefined}
-            >
-                <div className="absolute inset-0 bg-linear-to-r from-[#0a0c10]/90 via-[#0a0c10]/60 to-transparent" />
-                <div className="absolute top-0 right-0 w-96 h-96 rounded-full bg-emerald-500/10 blur-3xl pointer-events-none" />
-                <div className="relative container">
-                    <nav className="flex items-center gap-1.5 text-sm text-white/50 mb-4 flex-wrap" aria-label="breadcrumb">
-                        <Link href="/" className="hover:text-white transition-colors">Home</Link>
-                        {breadcrumbLinks.map((ancestor) => (
-                            <span key={ancestor._id} className="flex items-center gap-1.5">
-                                <span className="text-white/30">›</span>
-                                <Link href={buildUrl(catPrefix, ancestor.slug)} className="hover:text-white transition-colors">
-                                    {ancestor.title}
-                                </Link>
-                            </span>
-                        ))}
-                        <span className="text-white/30">›</span>
-                        <span className="text-white/80 font-medium">{data.title}</span>
-                    </nav>
-                    <h1 className="text-3xl sm:text-5xl font-extrabold text-white leading-tight capitalize">
-                        {data.title}
-                    </h1>
-                    {shortDescription && (
-                        <div
-                            className="text-white/80 text-sm sm:text-base mt-2 max-w-3xl leading-relaxed"
-                            dangerouslySetInnerHTML={{ __html: shortDescription }}
-                        />
-                    )}
-                    <div className="flex items-center gap-3 mt-4 flex-wrap">
-                        <span className="text-white/50 text-sm">
-                            {allProducts.length} product{allProducts.length !== 1 ? 's' : ''}
-                        </span>
-                        <span className={`text-xs font-semibold px-3 py-1 rounded-full capitalize ${
-                            data.status === 'published'
-                                ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                                : 'bg-white/10 text-white/60'
-                        }`}>
-                            {data.status}
-                        </span>
+            {/* ── Modern Minimal Header ── */}
+            {catImage ? (
+                <header
+                    className="relative py-16 px-4 sm:px-6 overflow-hidden bg-gray-950"
+                    style={{
+                        backgroundImage:    `url(${catImage})`,
+                        backgroundSize:     'cover',
+                        backgroundPosition: 'center',
+                    }}
+                >
+                    <div className="absolute inset-0 bg-gradient-to-r from-black/85 via-black/65 to-black/45" />
+                    <div className="relative max-w-7xl mx-auto">
+                        <nav className="flex items-center gap-1.5 text-xs sm:text-sm text-gray-300 mb-4 flex-wrap" aria-label="breadcrumb">
+                            <Link href="/" className="hover:text-white transition-colors flex items-center gap-1">
+                                <Icon icon="solar:home-smile-linear" width={14} />
+                                <span>Home</span>
+                            </Link>
+                            {breadcrumbLinks.map((ancestor) => (
+                                <span key={ancestor._id} className="flex items-center gap-1.5">
+                                    <span className="text-gray-400">/</span>
+                                    <Link href={buildUrl(catPrefix, ancestor.slug)} className="hover:text-white transition-colors">
+                                        {ancestor.title}
+                                    </Link>
+                                </span>
+                            ))}
+                            <span className="text-gray-400">/</span>
+                            <span className="text-white font-medium">{data.title}</span>
+                        </nav>
+
+                        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+                            <div>
+                                <h1 className="text-3xl sm:text-5xl font-black text-white leading-tight capitalize tracking-tight">
+                                    {data.title}
+                                </h1>
+                                {shortDescription && (
+                                    <div
+                                        className="text-gray-200 text-sm sm:text-base mt-2 max-w-3xl leading-relaxed"
+                                        dangerouslySetInnerHTML={{ __html: shortDescription }}
+                                    />
+                                )}
+                            </div>
+                            <div className="flex items-center gap-2 flex-wrap shrink-0">
+                                <span className="bg-white/20 backdrop-blur-md text-white border border-white/30 text-xs font-semibold px-3 py-1.5 rounded-full shadow-2xs">
+                                    {allProducts.length} product{allProducts.length !== 1 ? 's' : ''}
+                                </span>
+                                {data.status && (
+                                    <span className="bg-black/40 backdrop-blur-md text-emerald-300 border border-emerald-500/30 text-xs font-medium px-3 py-1.5 rounded-full capitalize">
+                                        {data.status}
+                                    </span>
+                                )}
+                            </div>
+                        </div>
                     </div>
-                </div>
-            </header>
+                </header>
+            ) : (
+                <header className="relative py-12 px-4 sm:px-6 bg-gradient-to-b from-gray-50 via-gray-50/50 to-white border-b border-gray-100">
+                    <div className="max-w-7xl mx-auto">
+                        <nav className="flex items-center gap-1.5 text-xs sm:text-sm text-gray-500 mb-3 flex-wrap" aria-label="breadcrumb">
+                            <Link href="/" className="hover:text-black transition-colors flex items-center gap-1">
+                                <Icon icon="solar:home-smile-linear" width={14} />
+                                <span>Home</span>
+                            </Link>
+                            {breadcrumbLinks.map((ancestor) => (
+                                <span key={ancestor._id} className="flex items-center gap-1.5">
+                                    <span className="text-gray-300">/</span>
+                                    <Link href={buildUrl(catPrefix, ancestor.slug)} className="hover:text-black transition-colors">
+                                        {ancestor.title}
+                                    </Link>
+                                </span>
+                            ))}
+                            <span className="text-gray-300">/</span>
+                            <span className="text-gray-950 font-semibold">{data.title}</span>
+                        </nav>
 
-            <div className="container py-8 space-y-6">
+                        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+                            <div>
+                                <h1 className="text-3xl sm:text-5xl font-black text-gray-950 leading-tight capitalize tracking-tight">
+                                    {data.title}
+                                </h1>
+                                {shortDescription && (
+                                    <div
+                                        className="text-gray-600 text-sm sm:text-base mt-2 max-w-3xl leading-relaxed"
+                                        dangerouslySetInnerHTML={{ __html: shortDescription }}
+                                    />
+                                )}
+                            </div>
+                            <div className="flex items-center gap-2 flex-wrap shrink-0">
+                                <span className="bg-gray-100 text-gray-900 border border-gray-200 text-xs font-semibold px-3 py-1.5 rounded-full shadow-2xs">
+                                    {allProducts.length} product{allProducts.length !== 1 ? 's' : ''}
+                                </span>
+                                {data.status && (
+                                    <span className="bg-emerald-50 text-emerald-700 border border-emerald-200/80 text-xs font-semibold px-3 py-1.5 rounded-full capitalize">
+                                        {data.status}
+                                    </span>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </header>
+            )}
 
+            {/* ── Main Category Container ── */}
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 space-y-6">
+
+                {/* Sub-category chips */}
                 {subCats.length > 0 && (
-                    <nav className="flex flex-wrap gap-2" aria-label="Sub-categories">
+                    <nav className="flex flex-wrap gap-2 pt-1" aria-label="Sub-categories">
                         {subCats.map((sub) => (
                             <Link
                                 key={sub._id}
                                 href={buildUrl(catPrefix, sub.slug)}
-                                className="inline-flex items-center px-4 py-1.5 rounded-full bg-white/5 border border-white/10 text-sm font-medium text-white/70 hover:border-emerald-500/40 hover:text-emerald-400 transition-colors"
+                                className="inline-flex items-center px-4 py-1.5 rounded-full bg-white border border-gray-200 hover:border-black text-xs sm:text-sm font-semibold text-gray-800 hover:text-black transition-all shadow-2xs hover:shadow-xs"
                             >
                                 {sub.title}
                             </Link>
@@ -339,6 +402,7 @@ export default function ProductCategoryLayout2({
                     </nav>
                 )}
 
+                {/* Filter & Product Grid Client Shell */}
                 {hasFilters || sortEnabled ? (
                     <ProductGridClient
                         totalProducts={allProducts.length}
@@ -348,7 +412,7 @@ export default function ProductCategoryLayout2({
                         attributeOptions={attrOptions}
                         showPriceFilter={priceFilter}
                         showSort={sortEnabled}
-                        theme="dark"
+                        theme="light"
                         activeFilters={activeFilters}
                         minPrice={minPrice}
                         maxPrice={maxPrice}
@@ -360,17 +424,16 @@ export default function ProductCategoryLayout2({
                     cardGrid
                 )}
 
-                {/* Category Description (Bottom) */}
+                {/* Category Full Description (Bottom) */}
                 {description && (
-                    <div className="bg-white/5 rounded-2xl border border-white/10 p-6 md:p-8 mt-8">
+                    <section className="bg-gray-50/60 rounded-2xl border border-gray-100 p-6 md:p-8 mt-12 shadow-2xs">
                         <div
-                            className="prose prose-invert max-w-none text-white/80 description"
+                            className="prose prose-gray max-w-none text-gray-800 leading-relaxed description"
                             dangerouslySetInnerHTML={{ __html: description }}
                         />
-                    </div>
+                    </section>
                 )}
             </div>
         </main>
     );
 }
-

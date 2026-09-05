@@ -10,11 +10,15 @@ import { usePathname } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import { Icon } from "@iconify/react";
+import { useSession } from "next-auth/react";
 import useSettings from "@/lib/useSettings";
+import ReviewModal, { type ReviewItemData } from "./ReviewModal";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 interface OrderItem {
+    productId?: string;
+    productSlug?: string;
     productTitle: string;
     productImage?: string;
     variantOptions?: Record<string, string>;
@@ -23,6 +27,7 @@ interface OrderItem {
     quantity: number;
     subtotal: number;
     orderNote?: string;
+    uploadedBy?: string;
 }
 
 interface Order {
@@ -119,11 +124,17 @@ export default function UserOrderDetails() {
     const id = pathname?.split("/").filter(Boolean).pop() ?? "";
     const { settings } = useSettings();
     const symbol = (settings?.product_currency_symbol || settings?.currency_symbol || "") as string;
+    const { data: session } = useSession();
 
     const [order,   setOrder]   = useState<Order | null>(null);
     const [loading, setLoading] = useState(true);
     const [error,   setError]   = useState("");
     const [locationMap, setLocationMap] = useState<Record<string, string>>({});
+
+    // ── Review state ──────────────────────────────────────────────────────────
+    const [reviewedMap,       setReviewedMap]       = useState<Record<string, any>>({});
+    const [reviewModalItem,   setReviewModalItem]   = useState<ReviewItemData | null>(null);
+    const [reviewSuccessMsg,  setReviewSuccessMsg]  = useState("");
 
     // ── Return request state ──────────────────────────────────────────────────
     const [returnRequests,     setReturnRequests]     = useState<any[]>([]);
@@ -145,6 +156,21 @@ export default function UserOrderDetails() {
         } catch { /* silent */ }
     };
 
+    const fetchReviews = async (orderNumber: string, userId?: string) => {
+        try {
+            const qs = new URLSearchParams({ orderNumber });
+            if (userId) qs.set("userId", userId);
+            const res = await fetch(`/api/comments?${qs}`, { credentials: "include" });
+            if (!res.ok) return;
+            const json = await res.json();
+            const map: Record<string, any> = {};
+            for (const r of json.data || []) {
+                if (r.targetId) map[r.targetId] = r;
+            }
+            setReviewedMap(map);
+        } catch { /* silent */ }
+    };
+
     useEffect(() => {
         if (!id) return;
         setLoading(true);
@@ -158,10 +184,14 @@ export default function UserOrderDetails() {
                 if (data.order?.status === "delivered") {
                     fetchReturnInfo(data.order.orderNumber);
                 }
+                if (data.order?.orderNumber) {
+                    const uId = (session?.user as any)?._id || "";
+                    fetchReviews(data.order.orderNumber, uId);
+                }
             })
             .catch(() => setError("Network error — please try again."))
             .finally(() => setLoading(false));
-    }, [id]);
+    }, [id, (session?.user as any)?._id]);
 
     useEffect(() => {
         fetch("/api/location/category?type=location")
@@ -397,6 +427,58 @@ export default function UserOrderDetails() {
                                     <p className="text-xs text-amber-700 bg-amber-50 px-2.5 py-1.5 rounded-xl mt-1.5 italic border border-amber-100">
                                         Note: {item.orderNote}
                                     </p>
+                                )}
+
+                                {/* ── Review status / Rate action ── */}
+                                {order.status !== "cancelled" && (
+                                    <div className="mt-2.5 flex items-center gap-2 flex-wrap">
+                                        {(() => {
+                                            const existingReview = reviewedMap[item.productId || ""] || reviewedMap[item.productSlug || ""];
+                                            if (existingReview) {
+                                                const isApproved = existingReview.status === "approved";
+                                                return (
+                                                    <div className="flex items-center gap-2">
+                                                        <span
+                                                            className={`inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1 rounded-xl border ${
+                                                                isApproved
+                                                                    ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                                                    : "bg-amber-50 text-amber-700 border-amber-200"
+                                                            }`}
+                                                        >
+                                                            <Icon
+                                                                icon={isApproved ? "solar:star-bold" : "solar:clock-circle-bold"}
+                                                                width={13}
+                                                                className={isApproved ? "text-amber-500" : "text-amber-600"}
+                                                            />
+                                                            Rated {existingReview.rating}★ · {isApproved ? "Approved" : "Pending Review"}
+                                                        </span>
+                                                    </div>
+                                                );
+                                            }
+
+                                            return (
+                                                <button
+                                                    type="button"
+                                                    onClick={() =>
+                                                        setReviewModalItem({
+                                                            productId: item.productId || item.productSlug || "",
+                                                            productTitle: item.productTitle,
+                                                            productImage: item.productImage,
+                                                            productSlug: item.productSlug,
+                                                            uploadedBy: item.uploadedBy,
+                                                            orderNumber: order.orderNumber,
+                                                            orderId: order._id,
+                                                            variantOptions: item.variantOptions,
+                                                        })
+                                                    }
+                                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200/80 text-xs font-bold transition-all shadow-xs"
+                                                >
+                                                    <Icon icon="solar:star-bold" width={13} className="text-amber-500" />
+                                                    Rate & Review Product
+                                                </button>
+                                            );
+                                        })()}
+                                    </div>
                                 )}
                             </div>
 
@@ -700,6 +782,42 @@ export default function UserOrderDetails() {
                         )}
                     </div>
                 </Section>
+            )}
+
+            {/* ── Review Success Alert ── */}
+            {reviewSuccessMsg && (
+                <div className="fixed bottom-6 right-6 z-50 flex items-center gap-3 bg-gray-900 text-white px-5 py-3.5 rounded-2xl shadow-xl border border-gray-700 animate-in fade-in slide-in-from-bottom-5">
+                    <Icon icon="solar:check-circle-bold" width={20} className="text-emerald-400 shrink-0" />
+                    <p className="text-sm font-medium">{reviewSuccessMsg}</p>
+                    <button
+                        onClick={() => setReviewSuccessMsg("")}
+                        className="ml-2 text-gray-400 hover:text-white"
+                    >
+                        ✕
+                    </button>
+                </div>
+            )}
+
+            {/* ── Review Modal ── */}
+            {reviewModalItem && session?.user && (
+                <ReviewModal
+                    item={reviewModalItem}
+                    isOpen={Boolean(reviewModalItem)}
+                    onClose={() => setReviewModalItem(null)}
+                    onSuccess={(newRev) => {
+                        setReviewedMap((prev) => ({
+                            ...prev,
+                            [newRev.targetId]: newRev,
+                        }));
+                        setReviewSuccessMsg("Thank you! Your review has been submitted for moderation.");
+                        setTimeout(() => setReviewSuccessMsg(""), 5000);
+                    }}
+                    user={{
+                        _id: (session.user as any)._id || "",
+                        name: session.user.name || "Customer",
+                        image: session.user.image || "",
+                    }}
+                />
             )}
 
             {/* ── Bottom action ── */}

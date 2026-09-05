@@ -8,14 +8,20 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { Icon } from "@iconify/react";
+import { useSession } from "next-auth/react";
 import useSettings from "@/lib/useSettings";
+import ReviewModal, { type ReviewItemData } from "./ReviewModal";
 
 interface OrderItem {
+    productId?: string;
+    productSlug?: string;
     productTitle: string;
     productImage?: string;
     quantity: number;
     price: number;
     subtotal: number;
+    uploadedBy?: string;
+    variantOptions?: Record<string, string>;
 }
 
 interface Order {
@@ -104,11 +110,14 @@ function SkeletonCard() {
 export default function UserOrderList() {
     const { settings } = useSettings();
     const symbol = (settings?.product_currency_symbol || settings?.currency_symbol || "") as string;
+    const { data: session } = useSession();
 
-    const [data,    setData]    = useState<PagedOrders | null>(null);
-    const [loading, setLoading] = useState(true);
-    const [page,    setPage]    = useState(1);
-    const [status,  setStatus]  = useState("");
+    const [data,             setData]             = useState<PagedOrders | null>(null);
+    const [loading,          setLoading]          = useState(true);
+    const [page,             setPage]             = useState(1);
+    const [status,           setStatus]           = useState("");
+    const [reviewModalItem,  setReviewModalItem]  = useState<ReviewItemData | null>(null);
+    const [reviewSuccessMsg, setReviewSuccessMsg] = useState("");
 
     useEffect(() => {
         setLoading(true);
@@ -130,6 +139,38 @@ export default function UserOrderList() {
 
     return (
         <div className="space-y-6">
+
+            {/* ── Review Success Alert ── */}
+            {reviewSuccessMsg && (
+                <div className="fixed bottom-6 right-6 z-50 flex items-center gap-3 bg-gray-900 text-white px-5 py-3.5 rounded-2xl shadow-xl border border-gray-700 animate-in fade-in slide-in-from-bottom-5">
+                    <Icon icon="solar:check-circle-bold" width={20} className="text-emerald-400 shrink-0" />
+                    <p className="text-sm font-medium">{reviewSuccessMsg}</p>
+                    <button
+                        onClick={() => setReviewSuccessMsg("")}
+                        className="ml-2 text-gray-400 hover:text-white"
+                    >
+                        ✕
+                    </button>
+                </div>
+            )}
+
+            {/* ── Review Modal ── */}
+            {reviewModalItem && session?.user && (
+                <ReviewModal
+                    item={reviewModalItem}
+                    isOpen={Boolean(reviewModalItem)}
+                    onClose={() => setReviewModalItem(null)}
+                    onSuccess={() => {
+                        setReviewSuccessMsg("Review submitted successfully! It will appear after moderation.");
+                        setTimeout(() => setReviewSuccessMsg(""), 5000);
+                    }}
+                    user={{
+                        _id: (session.user as any)._id || "",
+                        name: session.user.name || "Customer",
+                        image: session.user.image || "",
+                    }}
+                />
+            )}
 
             {/* ── Page title ── */}
             <div className="flex items-center justify-between gap-3 flex-wrap">
@@ -329,12 +370,36 @@ export default function UserOrderList() {
                                 </p>
                             </div>
 
-                            {/* View button */}
-                            <Link href={`/account/orders/${order._id}`}
-                                className={`shrink-0 inline-flex items-center gap-1.5 px-4 py-2.5 rounded-2xl text-sm font-bold transition-all ${s.bg} ${s.text} hover:opacity-80`}>
-                                View
-                                <Icon icon="solar:arrow-right-bold" width={13} />
-                            </Link>
+                            {/* Action buttons */}
+                            <div className="flex items-center gap-2 shrink-0">
+                                {order.status !== "cancelled" && fi && (
+                                    <button
+                                        type="button"
+                                        onClick={() =>
+                                            setReviewModalItem({
+                                                productId: fi.productId || fi.productSlug || "",
+                                                productTitle: fi.productTitle,
+                                                productImage: fi.productImage,
+                                                productSlug: fi.productSlug,
+                                                uploadedBy: fi.uploadedBy,
+                                                orderNumber: order.orderNumber,
+                                                orderId: order._id,
+                                                variantOptions: fi.variantOptions,
+                                            })
+                                        }
+                                        className="inline-flex items-center gap-1.5 px-3 py-2.5 rounded-2xl text-xs font-bold bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200/80 transition-all shadow-xs"
+                                    >
+                                        <Icon icon="solar:star-bold" width={13} className="text-amber-500" />
+                                        Rate
+                                    </button>
+                                )}
+
+                                <Link href={`/account/orders/${order._id}`}
+                                    className={`inline-flex items-center gap-1.5 px-4 py-2.5 rounded-2xl text-sm font-bold transition-all ${s.bg} ${s.text} hover:opacity-80`}>
+                                    View
+                                    <Icon icon="solar:arrow-right-bold" width={13} />
+                                </Link>
+                            </div>
                         </div>
                     </div>
                 );

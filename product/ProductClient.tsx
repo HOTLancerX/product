@@ -714,11 +714,11 @@ function Layout2Shell(props: ShellProps) {
     const inStock = currentStock > 0;
 
     return (
-        <div className="bg-[#0a0c10]">
+        <div className="bg-white text-black">
             <div className="relative overflow-hidden">
                 <div className="absolute inset-0 pointer-events-none">
-                    <div className="absolute top-0 left-1/4 w-96 h-96 rounded-full bg-emerald-500/10 blur-3xl" />
-                    <div className="absolute bottom-0 right-1/4 w-80 h-80 rounded-full bg-teal-500/10 blur-3xl" />
+                    <div className="absolute top-0 left-1/4 w-96 h-96 rounded-full bg-emerald-500/5 blur-3xl" />
+                    <div className="absolute bottom-0 right-1/4 w-80 h-80 rounded-full bg-teal-500/5 blur-3xl" />
                 </div>
 
                 <div className="relative container py-10">
@@ -732,12 +732,12 @@ function Layout2Shell(props: ShellProps) {
                         {/* Info column */}
                         <div className="flex flex-col gap-5">
 
-                            <h1 className="text-3xl md:text-4xl font-extrabold text-white leading-tight">
+                            <h1 className="text-3xl md:text-4xl font-extrabold text-black leading-tight">
                                 {data.title}
                             </h1>
 
                             {shortDescription && (
-                                <div className="text-gray-400 description text-sm leading-relaxed"
+                                <div className="text-gray-600 description text-sm leading-relaxed"
                                     dangerouslySetInnerHTML={{ __html: shortDescription }} />
                             )}
 
@@ -769,15 +769,15 @@ function Layout2Shell(props: ShellProps) {
                                 <div className="flex items-center gap-3 flex-wrap">
                                     {hasDiscount && regularPrice > 0 && (
                                         <>
-                                            <span className="text-lg text-gray-500 line-through">
+                                            <span className="text-lg text-gray-400 line-through">
                                                 {currencySymbol}&nbsp;{fmtPrice(regularPrice)}
                                             </span>
-                                            <span className="bg-emerald-500 text-white text-xs font-bold px-2 py-0.5 rounded">
+                                            <span className="bg-emerald-600 text-white text-xs font-bold px-2 py-0.5 rounded">
                                                 {discountPercent}% OFF
                                             </span>
                                         </>
                                     )}
-                                    <span className="text-4xl font-black text-emerald-400 tabular-nums">
+                                    <span className="text-4xl font-black text-emerald-600 tabular-nums">
                                         {currencySymbol}&nbsp;{fmtPrice(currentPrice)}
                                     </span>
                                 </div>
@@ -785,7 +785,7 @@ function Layout2Shell(props: ShellProps) {
 
                             {/* Variant selector */}
                             {priceType === 'variant' && variants.length > 0 && (
-                                <div className="text-white">
+                                <div className="text-black">
                                     <Variant
                                         info={{ variants, selectedAttributes: [], variantDisplayStyle }}
                                         attributes={attributes}
@@ -800,30 +800,30 @@ function Layout2Shell(props: ShellProps) {
                             {/* Order note */}
                             {orderNote && (
                                 <div>
-                                    <label className="block text-sm font-medium text-gray-300 mb-1">{orderNote}</label>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">{orderNote}</label>
                                     <textarea rows={3} value={noteValue}
                                         onChange={(e) => setNoteValue(e.target.value)}
                                         placeholder="Add a note (optional)"
-                                        className="w-full px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-gray-200 resize-none focus:outline-none focus:ring-2 focus:ring-emerald-500 placeholder-gray-600" />
+                                        className="w-full px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-black resize-none focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white placeholder-gray-400" />
                                 </div>
                             )}
 
                             {/* Stock */}
                             {inStock ? (
-                                <span className="inline-flex items-center gap-1.5 text-sm text-emerald-400">
+                                <span className="inline-flex items-center gap-1.5 text-sm text-emerald-600 font-medium">
                                     <Icon icon="mdi:package-variant-closed-check" width="18" height="18" />
                                     {currentStock} in stock
                                 </span>
                             ) : (
-                                <span className="text-sm text-red-400 font-medium">Out of stock</span>
+                                <span className="text-sm text-red-500 font-medium">Out of stock</span>
                             )}
 
                             {/* Quantity */}
                             <div>
-                                <p className="text-sm font-medium text-gray-300 mb-2">Quantity</p>
-                                <div className="border border-white/10 rounded-lg w-fit overflow-hidden flex">
+                                <p className="text-sm font-medium text-gray-700 mb-2">Quantity</p>
+                                <div className="border border-gray-200 rounded-lg w-fit overflow-hidden flex bg-white">
                                     <button type="button" onClick={dec} disabled={quantity <= 1}
-                                        className="px-4 py-2.5 text-gray-300 hover:bg-white/10 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+                                        className="px-4 py-2.5 text-gray-600 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
                                         <Icon icon="mdi:minus" width="18" height="18" />
                                     </button>
                                     <input type="text" inputMode="numeric" value={quantity}
@@ -831,10 +831,10 @@ function Layout2Shell(props: ShellProps) {
                                             const v = parseInt(e.target.value.replace(/\D/g, ''), 10) || 1;
                                             setQuantity(Math.min(Math.max(1, v), currentStock || 9999));
                                         }}
-                                        className="w-14 text-center bg-transparent border-x border-white/10 py-2.5 text-white text-sm focus:outline-none" />
+                                        className="w-14 text-center bg-transparent border-x border-gray-200 py-2.5 text-black font-semibold text-sm focus:outline-none" />
                                     <button type="button" onClick={inc}
                                         disabled={currentStock > 0 && quantity >= currentStock}
-                                        className="px-4 py-2.5 text-gray-300 hover:bg-white/10 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
+                                        className="px-4 py-2.5 text-gray-600 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
                                         <Icon icon="mdi:plus" width="18" height="18" />
                                     </button>
                                 </div>
@@ -843,11 +843,11 @@ function Layout2Shell(props: ShellProps) {
                             {/* Cart buttons */}
                             <div className="grid grid-cols-2 gap-3">
                                 <button type="button" onClick={handleAddToCart} disabled={!inStock}
-                                    className="py-3.5 rounded-xl bg-emerald-500 text-white font-bold hover:bg-emerald-400 disabled:opacity-40 disabled:cursor-not-allowed transition shadow-lg shadow-emerald-900/50">
+                                    className="py-3.5 rounded-xl bg-emerald-600 text-white font-bold hover:bg-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed transition shadow-md shadow-emerald-600/20">
                                     {inStock ? 'Add to Cart' : 'Out of Stock'}
                                 </button>
                                 <button type="button" onClick={handleBuyNow} disabled={!inStock}
-                                    className="py-3.5 rounded-xl border border-emerald-500/40 text-emerald-400 font-bold hover:bg-emerald-500/10 disabled:opacity-40 disabled:cursor-not-allowed transition flex items-center justify-center gap-2">
+                                    className="py-3.5 rounded-xl border-2 border-emerald-600 text-emerald-600 font-bold hover:bg-emerald-50 disabled:opacity-40 disabled:cursor-not-allowed transition flex items-center justify-center gap-2">
                                     <Icon icon="mdi:lightning-bolt" width="18" height="18" />
                                     {inStock ? 'Buy Now' : 'Out of Stock'}
                                 </button>

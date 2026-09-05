@@ -1,23 +1,13 @@
 /**
- * Product Category Layout 1 — Clean shop-style. Fully server-rendered.
+ * Product Category Layout 1 — Clean Shop Style (Light Theme). Fully server-rendered.
  *
- * No client-side hook resolution. The active product-box component is
- * resolved here on the server from the permanent _rootPages registry
- * (already populated by getRootPages() in the slug page).  Products are
- * filtered and sorted server-side from URL search params passed through
- * the pageData prop.
- *
- * Only the filter panel UI and sort dropdown are client-side (ProductGridClient),
- * so the first paint contains real product cards — no loading skeleton.
- *
- * Settings keys that control this layout:
- *   product_cat_filter_enabled  — "0" to disable filter panel (default on)
- *   product_cat_filter_style    — "1" | "2" | "3" | "4"  (default "1")
- *   product_cat_price_filter    — "0" to hide price range (default on)
- *   product_cat_sort_enabled    — "0" to hide sort dropdown (default on)
+ * Background: Clean white
+ * Typography: Crisp dark / black text
+ * Fully dynamic: Admin settings, grid columns/gaps, filters, sorting, breadcrumbs, and active product-box components.
  */
 
 import Link from 'next/link';
+import { Icon } from '@iconify/react';
 import { getAllRootPages } from '@/hook';
 import type { CategoryPageData, CategoryProduct } from '@/plugin/product/lib/types';
 import ProductGridClient from './ProductGridClient';
@@ -82,8 +72,6 @@ function applyFiltersAndSort(
             try { blob = JSON.parse(p.info['_variate'] ?? '{}'); } catch { /* skip */ }
 
             const priceType: string = blob.priceType ?? 'single';
-
-            // Build a map of { labelSlug → Set<value> } for this product
             const productValues: Map<string, Set<string>> = new Map();
 
             if (priceType === 'single') {
@@ -96,7 +84,6 @@ function applyFiltersAndSort(
                     productValues.set(id, set);
                 }
             } else {
-                // Variant: collect from selectedAttributes values + actual variant options
                 const selAttrs: { label: string; values: string[] }[] = blob.selectedAttributes ?? [];
                 for (const attr of selAttrs) {
                     if (!attr.label) continue;
@@ -117,12 +104,10 @@ function applyFiltersAndSort(
                 }
             }
 
-            // Product must match ALL active filter groups
             for (const [attrId, filterValues] of Object.entries(activeFilters)) {
                 if (!filterValues.length) continue;
                 const productSet = productValues.get(attrId);
                 if (!productSet) return false;
-                // At least one of the selected filter values must match
                 const hasMatch = filterValues.some(fv => productSet.has(fv.toLowerCase()));
                 if (!hasMatch) return false;
             }
@@ -142,7 +127,6 @@ function applyFiltersAndSort(
         });
     }
 
-    // Sort — price reads from _variate blob
     const getPrice = (p: CategoryProduct): number => {
         try {
             const blob = JSON.parse(p.info['_variate'] ?? '{}');
@@ -156,13 +140,13 @@ function applyFiltersAndSort(
         case 'title_asc':  result.sort((a, b) => a.title.localeCompare(b.title)); break;
         case 'title_desc': result.sort((a, b) => b.title.localeCompare(a.title)); break;
         case 'oldest':     break;
-        default:           result.reverse(); break; // newest
+        default:           result.reverse(); break;
     }
 
     return result;
 }
 
-// ── Resolve the active product-box component server-side ─────────────────────
+// ── Resolve active box component server-side ─────────────────────────────────
 
 function resolveBoxComponent(
     activeBox: { label: string; pluginNx: string } | null
@@ -251,9 +235,7 @@ export default function ProductCategoryLayout1({
 
     const catImage        = data.info?.cat_image ?? '';
     const breadcrumbLinks = ancestors.slice(0, -1);
-    // The current category _id — used as fallback for products that lack a
-    // category field (shouldn't happen, but defensive).
-    const currentCatId = data._id;
+    const currentCatId    = data._id;
 
     // ── Dynamic Grid Columns & Gaps from Admin Settings ───────────────────────
     const mobColsClass  = Number(settings.category_grid_cols_mobile)  || 2;
@@ -268,12 +250,17 @@ export default function ProductCategoryLayout1({
 
     // ── Render product cards (pure server JSX) ────────────────────────────────
     const cardGrid = products.length === 0 ? (
-        <div className="text-center py-20 text-gray-400">
-            <p className="text-4xl mb-4">🛍️</p>
-            <p className="text-lg font-medium">
+        <div className="text-center py-20 text-gray-500 bg-gray-50/50 rounded-2xl border border-gray-100 p-8">
+            <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gray-100 flex items-center justify-center text-gray-400">
+                <Icon icon="solar:box-minimalistic-linear" width={32} />
+            </div>
+            <p className="text-lg font-semibold text-gray-800">
                 {Object.keys(activeFilters).length > 0 || minPrice !== undefined || maxPrice !== undefined
                     ? 'No products match your filters.'
                     : 'No products in this category yet.'}
+            </p>
+            <p className="text-sm text-gray-500 mt-1 max-w-sm mx-auto">
+                Try adjusting your search criteria or resetting active filters to find what you are looking for.
             </p>
         </div>
     ) : (
@@ -290,11 +277,14 @@ export default function ProductCategoryLayout1({
                     <Link
                         key={product._id}
                         href={buildUrl(productPrefix, product.slug)}
-                        className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow p-4"
+                        className="bg-white rounded-xl border border-gray-200 shadow-2xs hover:shadow-md hover:border-gray-900 transition-all p-4 flex flex-col justify-between"
                     >
-                        <p className="text-sm font-semibold text-gray-900 line-clamp-2">
+                        <p className="text-sm font-semibold text-gray-950 line-clamp-2 leading-snug">
                             {product.title}
                         </p>
+                        <span className="text-xs font-medium text-gray-500 mt-3 inline-flex items-center gap-1">
+                            View Product <Icon icon="solar:arrow-right-linear" width={12} />
+                        </span>
                     </Link>
                 )
             )}
@@ -302,59 +292,112 @@ export default function ProductCategoryLayout1({
     );
 
     return (
-        <main className="min-h-screen bg-gray-50">
+        <main className="min-h-screen bg-white text-gray-950 antialiased">
 
-            {/* ── Banner ── */}
-            <header
-                className="relative bg-main py-12 overflow-hidden"
-                style={catImage ? {
-                    backgroundImage:    `url(${catImage})`,
-                    backgroundSize:     'cover',
-                    backgroundPosition: 'center',
-                } : undefined}
-            >
-                {catImage && <div className="absolute inset-0 bg-black/50" />}
-                <div className="relative container">
-                    <nav className="flex items-center gap-1.5 text-sm text-white/70 mb-4 flex-wrap" aria-label="breadcrumb">
-                        <Link href="/" className="hover:text-white transition-colors">Home</Link>
-                        {breadcrumbLinks.map((ancestor) => (
-                            <span key={ancestor._id} className="flex items-center gap-1.5">
-                                <span className="text-white/40">›</span>
-                                <Link href={buildUrl(catPrefix, ancestor.slug)} className="hover:text-white transition-colors">
-                                    {ancestor.title}
-                                </Link>
-                            </span>
-                        ))}
-                        <span className="text-white/40">›</span>
-                        <span className="text-white font-medium">{data.title}</span>
-                    </nav>
-                    <h1 className="text-3xl sm:text-4xl font-extrabold text-white capitalize leading-tight">
-                        {data.title}
-                    </h1>
-                    {shortDescription && (
-                        <div
-                            className="text-white/90 text-sm sm:text-base mt-2 max-w-3xl leading-relaxed"
-                            dangerouslySetInnerHTML={{ __html: shortDescription }}
-                        />
-                    )}
-                    <div className="flex items-center gap-3 mt-3 flex-wrap">
-                        <span className="text-white/70 text-sm">
-                            {allProducts.length} product{allProducts.length !== 1 ? 's' : ''}
-                        </span>
+            {/* ── Header / Hero Banner ── */}
+            {catImage ? (
+                <header
+                    className="relative py-14 px-4 sm:px-6 overflow-hidden bg-gray-900"
+                    style={{
+                        backgroundImage:    `url(${catImage})`,
+                        backgroundSize:     'cover',
+                        backgroundPosition: 'center',
+                    }}
+                >
+                    <div className="absolute inset-0 bg-linear-to-r from-black/80 via-black/60 to-black/40 backdrop-blur-[2px]" />
+                    <div className="container">
+                        {/* Breadcrumbs */}
+                        <nav className="flex items-center gap-1.5 text-xs sm:text-sm text-gray-300 mb-4 flex-wrap" aria-label="breadcrumb">
+                            <Link href="/" className="hover:text-white transition-colors flex items-center gap-1">
+                                <Icon icon="solar:home-2-linear" width={14} />
+                                <span>Home</span>
+                            </Link>
+                            {breadcrumbLinks.map((ancestor) => (
+                                <span key={ancestor._id} className="flex items-center gap-1.5">
+                                    <span className="text-gray-400">/</span>
+                                    <Link href={buildUrl(catPrefix, ancestor.slug)} className="hover:text-white transition-colors">
+                                        {ancestor.title}
+                                    </Link>
+                                </span>
+                            ))}
+                            <span className="text-gray-400">/</span>
+                            <span className="text-white font-medium">{data.title}</span>
+                        </nav>
+
+                        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+                            <div>
+                                <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-white tracking-tight capitalize leading-tight">
+                                    {data.title}
+                                </h1>
+                                {shortDescription && (
+                                    <div
+                                        className="text-gray-200 text-sm sm:text-base mt-2.5 max-w-3xl leading-relaxed font-normal"
+                                        dangerouslySetInnerHTML={{ __html: shortDescription }}
+                                    />
+                                )}
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                                <span className="bg-white/20 backdrop-blur-md text-white border border-white/30 text-xs font-semibold px-3 py-1.5 rounded-full shadow-2xs">
+                                    {allProducts.length} product{allProducts.length !== 1 ? 's' : ''}
+                                </span>
+                            </div>
+                        </div>
                     </div>
-                </div>
-            </header>
+                </header>
+            ) : (
+                <header className="relative py-10 px-4 sm:px-6 bg-linear-to-b from-gray-50/80 via-gray-50/40 to-white border-b border-gray-100">
+                    <div className="container">
+                        {/* Breadcrumbs */}
+                        <nav className="flex items-center gap-1.5 text-xs sm:text-sm text-gray-500 mb-3 flex-wrap" aria-label="breadcrumb">
+                            <Link href="/" className="hover:text-gray-950 transition-colors flex items-center gap-1">
+                                <Icon icon="solar:home-2-linear" width={14} />
+                                <span>Home</span>
+                            </Link>
+                            {breadcrumbLinks.map((ancestor) => (
+                                <span key={ancestor._id} className="flex items-center gap-1.5">
+                                    <span className="text-gray-300">/</span>
+                                    <Link href={buildUrl(catPrefix, ancestor.slug)} className="hover:text-gray-950 transition-colors">
+                                        {ancestor.title}
+                                    </Link>
+                                </span>
+                            ))}
+                            <span className="text-gray-300">/</span>
+                            <span className="text-gray-900 font-semibold">{data.title}</span>
+                        </nav>
 
+                        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+                            <div>
+                                <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black text-gray-950 tracking-tight capitalize leading-tight">
+                                    {data.title}
+                                </h1>
+                                {shortDescription && (
+                                    <div
+                                        className="text-gray-600 text-sm sm:text-base mt-2 max-w-3xl leading-relaxed font-normal"
+                                        dangerouslySetInnerHTML={{ __html: shortDescription }}
+                                    />
+                                )}
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                                <span className="bg-gray-100 text-gray-900 border border-gray-200/80 text-xs font-semibold px-3 py-1.5 rounded-full shadow-2xs">
+                                    {allProducts.length} product{allProducts.length !== 1 ? 's' : ''}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                </header>
+            )}
+
+            {/* ── Main Category Container ── */}
             <div className="container py-8 space-y-6">
 
                 {/* Sub-category chips */}
                 {subCats.length > 0 && (
-                    <nav className="flex flex-wrap gap-2" aria-label="Sub-categories">
+                    <nav className="flex flex-wrap gap-2 pt-1" aria-label="Sub-categories">
                         {subCats.map((sub) => (
                             <Link
                                 key={sub._id}
                                 href={buildUrl(catPrefix, sub.slug)}
-                                className="inline-flex items-center px-4 py-1.5 rounded-full bg-white border border-gray-200 text-sm font-medium text-gray-700 hover:border-emerald-400 hover:text-emerald-700 transition-colors shadow-sm"
+                                className="inline-flex items-center px-4 py-1.5 rounded-full bg-white border border-gray-200 hover:border-gray-900 text-xs sm:text-sm font-semibold text-gray-800 hover:text-black hover:shadow-xs transition-all"
                             >
                                 {sub.title}
                             </Link>
@@ -362,7 +405,7 @@ export default function ProductCategoryLayout1({
                     </nav>
                 )}
 
-                {/* Client shell — wraps server-rendered cards with filter/sort UI when enabled */}
+                {/* Filter & Product Grid Client Shell */}
                 {hasFilters || sortEnabled ? (
                     <ProductGridClient
                         totalProducts={allProducts.length}
@@ -384,17 +427,16 @@ export default function ProductCategoryLayout1({
                     cardGrid
                 )}
 
-                {/* Category Description (Bottom) */}
+                {/* Category Full Description (Bottom) */}
                 {description && (
-                    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 md:p-8 mt-8">
+                    <section className="bg-gray-50/50 rounded-2xl border border-gray-100 p-6 md:p-8 mt-12 shadow-2xs">
                         <div
-                            className="prose max-w-none text-gray-700 description"
+                            className="prose prose-gray max-w-none text-gray-800 leading-relaxed description"
                             dangerouslySetInnerHTML={{ __html: description }}
                         />
-                    </div>
+                    </section>
                 )}
             </div>
         </main>
     );
 }
-

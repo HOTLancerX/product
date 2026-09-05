@@ -79,6 +79,7 @@ export function register() {
     registerLazyComponent("product.DeliveredOrdersPage", () => import("./orders/delivered/page"), PLUGINS.nx);
     registerLazyComponent("product.CancelledOrdersPage", () => import("./orders/cancelled/page"), PLUGINS.nx);
     registerLazyComponent("product.ReturnManager", () => import("./orders/ReturnManager"), PLUGINS.nx);
+    registerLazyComponent("product.AdminReviewsPage", () => import("./admin/ReviewsPage"), PLUGINS.nx);
     registerLazyComponent("product.UserOrderList", () => import("./users/orderlist"), PLUGINS.nx);
     registerLazyComponent("product.UserOrderDetails", () => import("./users/orderdetails"), PLUGINS.nx);
     // ─── Register post & category types ────────────────────────────────────
@@ -169,6 +170,14 @@ export function register() {
             slug: "product/import",
             parent: "product",
             position: 6,
+        },
+        {
+            key: "product-reviews",
+            label: "Reviews",
+            icon: "solar:star-bold",
+            slug: "product/reviews",
+            parent: "product",
+            position: 7,
         },
     ], PLUGINS.nx);
 
@@ -400,7 +409,7 @@ export function register() {
     addHook("root.pages", [
         {
             key: "product",
-            label: "Product Layout 1",
+            label: "box 1",
             type: "product",
             slug: "dynamic",
             style: "left",
@@ -409,8 +418,8 @@ export function register() {
             component: ProductLayout1,
         },
         {
-            key: "product",
-            label: "Product Layout 2",
+            key: "product-2x",
+            label: "box 2",
             type: "product",
             slug: "dynamic",
             style: "left",
@@ -429,7 +438,7 @@ export function register() {
             component: Header4,
         },
         {
-            key: "header",
+            key: "header-x",
             label: "Header Layout 6 (Top-Up / SEAGM Style)",
             type: "header",
             slug: "layout",
@@ -444,7 +453,7 @@ export function register() {
     addHook("root.pages", [
         {
             key: "product-category",
-            label: "Product Category Layout 1",
+            label: "Category 1",
             type: "product-category",
             slug: "dynamic",
             style: "left",
@@ -453,8 +462,8 @@ export function register() {
             component: ProductCategoryLayout1,
         },
         {
-            key: "product-category",
-            label: "Product Category Layout 2",
+            key: "product-category-2",
+            label: "Category 2",
             type: "product-category",
             slug: "dynamic",
             style: "left",
@@ -470,7 +479,7 @@ export function register() {
     addHook("root.pages", [
         {
             key: "product-box",
-            label: "Product Box 1",
+            label: "Box 1",
             type: "product-box",
             slug: "dynamic",
             style: "left",
@@ -479,8 +488,8 @@ export function register() {
             component: ProductBox1,
         },
         {
-            key: "product-box",
-            label: "Product Box 2",
+            key: "product-box-2",
+            label: "Box 2",
             type: "product-box",
             slug: "dynamic",
             style: "left",
@@ -633,6 +642,14 @@ export function register() {
             style: "left",
             position: 20,
             path: ProductSettingsPage,
+        },
+        {
+            key: "product/reviews",
+            label: "Product Reviews",
+            type: "product-reviews",
+            style: "left",
+            position: 22,
+            lazyPath: "product.AdminReviewsPage",
         },
         {
             key: "product/import",

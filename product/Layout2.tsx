@@ -5,6 +5,7 @@
  */
 
 import ProductClient from './ProductClient';
+import ProductReviewsList from './ProductReviewsList';
 
 interface ProductPageProps {
     data: {
@@ -26,6 +27,7 @@ interface ProductPageProps {
         categoryProducts?: any[] | null;
         flashSaleCampaign?: any | null;
         brand?:             { _id: string; title: string; slug: string } | null;
+        reviewsData?:       any | null;
     };
 }
 
@@ -102,48 +104,57 @@ export default function ProductLayout2({ data, settings = {}, permalinkMap = {},
     const sellerPrefix = (permalinkMap['seller'] ?? 'seller')
         .trim().replace(/^\/+|\/+$/g, '') || 'seller';
 
+    const reviewsData = pageData?.reviewsData ?? null;
+
     return (
-        <ProductClient
-            layout={2}
-            data={{ id: String(data._id), title: data.title, slug: data.slug }}
-            productId={String(data._id)}
-            categoryId={data.category ?? null}
-            priceType={priceType}
-            regularPrice={regularPrice}
-            sellingPrice={sellingPrice}
-            displayPrice={displayPrice}
-            hasDiscount={hasDiscount}
-            discountPercent={discountPercent}
-            singleStock={singleStock}
-            variants={variants}
-            selectedAttributes={selectedAttributes}
-            variantDisplayStyle={variantDisplayStyle}
-            allImages={allImages}
-            specifications={specifications}
-            compareIds={compareIds}
-            currencySymbol={currencySymbol}
-            whatsappNumber={whatsappNumber}
-            telegramUsername={telegramUsername}
-            facebookPageId={facebookPageId}
-            shortDescription={shortDescription}
-            description={description}
-            htmlDescription={htmlDescription}
-            orderNote={orderNote}
-            shippingInside={shippingInside}
-            shippingOutside={shippingOutside}
-            shippingInsideLabel={shippingInsideLabel}
-            shippingOutsideLabel={shippingOutsideLabel}
-            shippingInsideRate={shippingInsideRate}
-            shippingOutsideRate={shippingOutsideRate}
-            relatedCols={relatedCols}
-            categoryLinks={categoryLinks}
-            compareProducts={compareProducts}
-            categoryProducts={categoryProducts}
-            flashSaleCampaign={flashSaleCampaign}
-            seller={seller ? {
-                ...seller,
-                profileUrl: buildUrl(sellerPrefix, seller.slug),
-            } : null}
-        />
+        <div className="bg-white space-y-6">
+            <ProductClient
+                layout={2}
+                data={{ id: String(data._id), title: data.title, slug: data.slug }}
+                productId={String(data._id)}
+                categoryId={data.category ?? null}
+                priceType={priceType}
+                regularPrice={regularPrice}
+                sellingPrice={sellingPrice}
+                displayPrice={displayPrice}
+                hasDiscount={hasDiscount}
+                discountPercent={discountPercent}
+                singleStock={singleStock}
+                variants={variants}
+                selectedAttributes={selectedAttributes}
+                variantDisplayStyle={variantDisplayStyle}
+                allImages={allImages}
+                specifications={specifications}
+                compareIds={compareIds}
+                currencySymbol={currencySymbol}
+                whatsappNumber={whatsappNumber}
+                telegramUsername={telegramUsername}
+                facebookPageId={facebookPageId}
+                shortDescription={shortDescription}
+                description={description}
+                htmlDescription={htmlDescription}
+                orderNote={orderNote}
+                shippingInside={shippingInside}
+                shippingOutside={shippingOutside}
+                shippingInsideLabel={shippingInsideLabel}
+                shippingOutsideLabel={shippingOutsideLabel}
+                shippingInsideRate={shippingInsideRate}
+                shippingOutsideRate={shippingOutsideRate}
+                relatedCols={relatedCols}
+                categoryLinks={categoryLinks}
+                compareProducts={compareProducts}
+                categoryProducts={categoryProducts}
+                flashSaleCampaign={flashSaleCampaign}
+                seller={seller ? {
+                    ...seller,
+                    profileUrl: buildUrl(sellerPrefix, seller.slug),
+                } : null}
+            />
+
+            {/* Server-Side Rendered Product Reviews */}
+            <div className="container my-8 pb-12">
+                <ProductReviewsList reviewsData={reviewsData} theme="light" />
+            </div>
+        </div>
     );
 }

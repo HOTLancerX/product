@@ -23,6 +23,7 @@ import UserInfo from "@/models/Users_info";
 import Post from "@/models/post";
 import PostInfo from "@/models/post_info";
 import Cat from "@/models/cat";
+import Comment from "@/models/Comment";
 import { Settings } from "@/lib/settings";
 
 // ── Category types ────────────────────────────────────────────────────────────
@@ -135,6 +136,72 @@ registerServerDataHook("product", async (id, _slug, data) => {
         } catch { /* non-critical */ }
     }
 
+    // ── Approved Product Reviews & Rating Summary ─────────────────────────
+    let reviewsData: {
+        reviews: any[];
+        averageRating: number;
+        totalReviews: number;
+        distribution: Record<number, number>;
+    } = {
+        reviews: [],
+        averageRating: 0,
+        totalReviews: 0,
+        distribution: { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 },
+    };
+
+    try {
+        const approvedComments = await Comment.find({
+            targetType: "product",
+            targetId: String(id),
+            status: "approved",
+        }).sort({ createdAt: -1 }).lean() as any[];
+
+        if (approvedComments && approvedComments.length > 0) {
+            const distribution = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
+            let ratingSum = 0;
+            let ratingCount = 0;
+
+            const sanitizedReviews = approvedComments.map((c) => {
+                const r = Number(c.rating) || 5;
+                if (r >= 1 && r <= 5) {
+                    distribution[r as 1 | 2 | 3 | 4 | 5] = (distribution[r as 1 | 2 | 3 | 4 | 5] || 0) + 1;
+                    ratingSum += r;
+                    ratingCount++;
+                }
+
+                return {
+                    _id: String(c._id),
+                    userName: String(c.userName || "Customer"),
+                    userImage: String(c.userImage || ""),
+                    rating: r,
+                    title: String(c.title || ""),
+                    content: String(c.content || ""),
+                    images: Array.isArray(c.images) ? c.images : [],
+                    orderNumber: String(c.orderNumber || ""),
+                    verifiedPurchase: Boolean(c.verifiedPurchase),
+                    reply: c.reply?.content
+                        ? {
+                              content: String(c.reply.content),
+                              authorName: String(c.reply.authorName || "Seller"),
+                              authorRole: String(c.reply.authorRole || "seller"),
+                              createdAt: c.reply.createdAt instanceof Date ? c.reply.createdAt.toISOString() : String(c.reply.createdAt || ""),
+                          }
+                        : null,
+                    createdAt: c.createdAt instanceof Date ? c.createdAt.toISOString() : String(c.createdAt || ""),
+                };
+            });
+
+            const averageRating = ratingCount > 0 ? parseFloat((ratingSum / ratingCount).toFixed(1)) : 0;
+
+            reviewsData = {
+                reviews: sanitizedReviews,
+                averageRating,
+                totalReviews: sanitizedReviews.length,
+                distribution,
+            };
+        }
+    } catch { /* non-critical */ }
+
     // Base pageData — other plugins enrich via registerProductEnricher()
     const base: Record<string, any> = {
         ancestors,
@@ -143,6 +210,7 @@ registerServerDataHook("product", async (id, _slug, data) => {
         compareProducts:   [],
         categoryProducts,
         flashSaleCampaign: null,
+        reviewsData,
     };
 
     // Run all registered product enrichers (compare, flash-sale, etc.)
