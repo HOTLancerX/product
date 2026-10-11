@@ -8,6 +8,7 @@ import useSettings from "@/lib/useSettings";
 import PaymentGatewaySettings from "./PaymentGatewaySettings";
 import CheckoutFieldSettings from "./CheckoutFieldSettings";
 import CategoryPageSettings from "./CategoryPageSettings";
+import ProductAiSettings from "./ProductAiSettings";
 
 /**
  * Product plugin settings page.
@@ -15,6 +16,7 @@ import CategoryPageSettings from "./CategoryPageSettings";
  *
  * Tabs:
  *   General   — currency, social order buttons, stock messaging
+ *   AI & Gemini — Google Gemini API key and AI copywriting settings
  *   Shipping  — shipping costs, free shipping threshold
  *   Category  — category page filter and sort options
  *   Checkout  — configurable checkout form fields (order/visibility/required)
@@ -34,6 +36,12 @@ const TABS: Tab[] = [
         label:       "General",
         icon:        "solar:settings-bold",
         description: "Currency, social order channels, stock messaging and product reviews.",
+    },
+    {
+        key:         "ai",
+        label:       "AI & Gemini",
+        icon:        "solar:magic-stick-3-bold",
+        description: "Configure Google Gemini API key and model for automated bulk product short descriptions.",
     },
     {
         key:         "shipping",
@@ -88,7 +96,7 @@ export default function ProductSettingsPage() {
             <div>
                 <h1 className="text-2xl font-bold text-gray-900">Product Settings</h1>
                 <p className="text-sm text-gray-500 mt-1">
-                    Configure your store's currency, shipping, checkout form and payment methods.
+                    Configure your store's currency, AI content generation, shipping, checkout form and payment methods.
                 </p>
             </div>
 
@@ -126,6 +134,10 @@ export default function ProductSettingsPage() {
                     activePlugins={activePlugins}
                     initialValues={settings}
                 />
+            )}
+
+            {activeTab === "ai" && (
+                <ProductAiSettings initialValues={settings} />
             )}
 
             {activeTab === "shipping" && (
