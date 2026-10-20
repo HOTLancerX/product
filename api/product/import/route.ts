@@ -66,44 +66,67 @@ function normalizeImages(val: any): string[] {
 }
 
 function extractImagesFromItem(item: any, imageKey?: string, galleryKey?: string): string[] {
-    const collected: string[] = [];
+    const coverImages: string[] = [];
+    const galleryImages: string[] = [];
 
-    if (imageKey && item[imageKey] !== undefined) {
-        collected.push(...normalizeImages(item[imageKey]));
-    }
-    if (galleryKey && item[galleryKey] !== undefined) {
-        collected.push(...normalizeImages(item[galleryKey]));
-    }
-
-    if (collected.length === 0) {
-        const aliases = [
-            "img",
-            "image",
-            "images",
-            "photo",
-            "photos",
-            "thumbnail",
-            "thumb",
-            "pic",
-            "picture",
-            "src",
-            "cover",
-            "coverImage",
-            "gallery",
-            "product_image",
-            "productImage",
-        ];
-        for (const alias of aliases) {
+    // 1. Extract cover / main image
+    if (imageKey && item[imageKey] !== undefined && item[imageKey] !== null && item[imageKey] !== "") {
+        coverImages.push(...normalizeImages(item[imageKey]));
+    } else {
+        const coverAliases = ["cover", "coverImage", "image", "img", "thumbnail", "thumb", "picture", "pic", "photo", "images"];
+        for (const alias of coverAliases) {
             if (item[alias] !== undefined && item[alias] !== null && item[alias] !== "") {
                 const norm = normalizeImages(item[alias]);
                 if (norm.length > 0) {
-                    collected.push(...norm);
+                    coverImages.push(...norm);
+                    break;
                 }
             }
         }
     }
 
-    return Array.from(new Set(collected));
+    // 2. Extract gallery images
+    if (galleryKey && item[galleryKey] !== undefined && item[galleryKey] !== null && item[galleryKey] !== "") {
+        galleryImages.push(...normalizeImages(item[galleryKey]));
+    } else {
+        const galleryAliases = ["gallery", "gallery_images", "additional_images", "extra_images", "photos", "pictures"];
+        for (const alias of galleryAliases) {
+            if (alias !== imageKey && item[alias] !== undefined && item[alias] !== null && item[alias] !== "") {
+                const norm = normalizeImages(item[alias]);
+                if (norm.length > 0) {
+                    galleryImages.push(...norm);
+                    break;
+                }
+            }
+        }
+    }
+
+    // 3. Extra check: if raw_images exists (e.g. from crawler or WooCommerce)
+    if (Array.isArray(item.raw_images) && item.raw_images.length > 1) {
+        const rawNorm = normalizeImages(item.raw_images);
+        if (rawNorm.length > 1) {
+            galleryImages.push(...rawNorm.slice(1));
+        }
+    }
+
+    // 4. Primary cover is the first cover image (or first gallery image if no cover)
+    const primaryCover = coverImages[0] || galleryImages[0] || "";
+    const extraCover = coverImages.slice(1);
+
+    // 5. Combine: Index 0 is Featured Image, Index 1..N are Gallery Images (matching PostForm.tsx)
+    const combined = [primaryCover, ...galleryImages, ...extraCover].filter(Boolean);
+
+    // Deduplicate while preserving index 0
+    const seen = new Set<string>();
+    const result: string[] = [];
+    for (const url of combined) {
+        if (!seen.has(url)) {
+            seen.add(url);
+            result.push(url);
+        }
+    }
+
+    return result;
 }
 
 function extractValue(item: any, customKey: string | undefined, aliases: string[]): any {
@@ -470,15 +493,133 @@ export async function POST(req: NextRequest) {
                         const effectiveSellingPrice = sellingPrice > 0 ? sellingPrice : regularPrice;
                         const effectiveRegularPrice = regularPrice > 0 ? regularPrice : sellingPrice;
 
+                        // Auto-convert WooCommerce / custom attributes into selectedAttributes
+                        const singleAttributes: Array<{ dbId: string; label: string; values: string[] }> = Array.isArray(item.singleAttributes)
+                            ? [...item.singleAttributes]
+                            : [];
+                        const selectedAttributes: Array<{ id: string; label: string; values: string[]; position: number; displayStyle: string }> = Array.isArray(item.selectedAttributes)
+                            ? [...item.selectedAttributes]
+                            : [];
+
+                        if (Array.isArray(item.attributes) && item.attributes.length > 0) {
+                            item.attributes.forEach((attr: any, idx: number) => {
+                                if (!attr || typeof attr !== "object") return;
+                                const label = String(attr.name || attr.label || attr.title || "").trim();
+                                if (!label) return;
+
+                                let values: string[] = [];
+                                if (Array.isArray(attr.terms)) {
+                                    values = attr.terms.map((t: any) => {
+                                        if (typeof t === "string") return t.trim();
+                                        return String(t?.name || t?.slug || "").trim();
+                                    }).filter(Boolean);
+                                } else if (Array.isArray(attr.options)) {
+                                    values = attr.options.map((o: any) => typeof o === "string" ? o.trim() : String(o?.name || "").trim()).filter(Boolean);
+                                } else if (Array.isArray(attr.values)) {
+                                    values = attr.values.map((v: any) => typeof v === "string" ? v.trim() : String(v?.name || "").trim()).filter(Boolean);
+                                } else if (typeof attr.value === "string" && attr.value.trim()) {
+                                    values = [attr.value.trim()];
+                                }
+
+                                if (values.length === 0) return;
+                                const attrId = String(attr.id || `attr-${idx + 1}`);
+
+                                if (!selectedAttributes.some((a) => a.label?.toLowerCase() === label.toLowerCase())) {
+                                    selectedAttributes.push({
+                                        id: attrId,
+                                        label,
+                                        values,
+                                        position: selectedAttributes.length + 1,
+                                        displayStyle: "text",
+                                    });
+                                }
+                            });
+                        }
+
+                        // Build attributeInputs map for each selectedAttribute
+                        const attributeInputs: Record<string, string> = typeof item.attributeInputs === "object" && item.attributeInputs !== null
+                            ? { ...item.attributeInputs }
+                            : {};
+                        selectedAttributes.forEach((attr) => {
+                            if (attributeInputs[attr.id] === undefined) {
+                                attributeInputs[attr.id] = "";
+                            }
+                        });
+
+                        // Auto-convert variations if present or generate combinations from selectedAttributes
+                        let derivedVariants = Array.isArray(item.variants) ? [...item.variants] : [];
+                        if (derivedVariants.length === 0 && Array.isArray(item.variations) && item.variations.length > 0) {
+                            derivedVariants = item.variations.map((v: any, vIdx: number) => {
+                                const vPrice = parsePrice(v.price || v.sale_price || v.regular_price || effectiveSellingPrice);
+                                const vQty = parseInt(String(v.stock_quantity ?? v.quantity ?? stock), 10) || stock;
+                                const optionsMap: Record<string, string> = {};
+
+                                if (Array.isArray(v.attributes)) {
+                                    v.attributes.forEach((va: any) => {
+                                        const optName = String(va.name || va.label || "").trim();
+                                        const optVal = String(va.option || va.value || va.name || "").trim();
+                                        if (optName && optVal) optionsMap[optName] = optVal;
+                                    });
+                                }
+
+                                return {
+                                    id: String(v.id || `v-${Date.now()}-${vIdx}`),
+                                    handle: String(v.slug || v.handle || `var-${vIdx + 1}`),
+                                    title: String(v.name || v.title || ""),
+                                    options: optionsMap,
+                                    sku: String(v.sku || ""),
+                                    price: vPrice > 0 ? String(vPrice) : (effectiveSellingPrice > 0 ? String(effectiveSellingPrice) : ""),
+                                    quantity: String(vQty),
+                                    emotion: "",
+                                    color: "",
+                                    image: v.image?.src || (typeof v.image === "string" ? v.image : (processedImages[0] || "")),
+                                    gallery: processedImages.slice(1),
+                                    priceTiers: [],
+                                    showTiers: false,
+                                };
+                            });
+                        } else if (derivedVariants.length === 0 && selectedAttributes.length > 0) {
+                            // Generate Cartesian product variants from selectedAttributes (matching Variate.tsx)
+                            const combos = selectedAttributes.reduce<Record<string, string>[]>((acc, attr) => {
+                                if (!acc.length) return attr.values.map((v: string) => ({ [attr.label]: v }));
+                                return acc.flatMap((combo) => attr.values.map((v: string) => ({ ...combo, [attr.label]: v })));
+                            }, []);
+
+                            derivedVariants = combos.map((options, i) => {
+                                const handle = Object.entries(options)
+                                    .map(([, v]) => String(v).toLowerCase().replace(/[^a-z0-9]+/g, "-"))
+                                    .join("-");
+                                const varSku = rawSku ? `${rawSku}-${handle}` : "";
+
+                                return {
+                                    id: `v-${Date.now()}-${i}`,
+                                    handle,
+                                    title: "",
+                                    options,
+                                    sku: varSku,
+                                    price: effectiveSellingPrice > 0 ? String(effectiveSellingPrice) : "",
+                                    quantity: stock > 0 ? String(stock) : "10",
+                                    emotion: "",
+                                    color: "",
+                                    image: processedImages[0] || "",
+                                    gallery: processedImages.slice(1),
+                                    priceTiers: [],
+                                    showTiers: false,
+                                };
+                            });
+                        }
+
+                        const isVariantType = selectedAttributes.length > 0 || derivedVariants.length > 0 || item.priceType === "variant";
+
                         const variatePayload = {
-                            priceType: item.priceType === "variant" ? "variant" : "single",
-                            regularprice: effectiveRegularPrice > 0 ? String(effectiveRegularPrice) : "",
-                            sellingprice: effectiveSellingPrice > 0 ? String(effectiveSellingPrice) : "",
-                            stock: String(stock),
-                            singleAttributes: Array.isArray(item.singleAttributes) ? item.singleAttributes : [],
-                            selectedAttributes: Array.isArray(item.selectedAttributes) ? item.selectedAttributes : [],
-                            attributeInputs: typeof item.attributeInputs === "object" ? item.attributeInputs : {},
-                            variants: Array.isArray(item.variants) ? item.variants : [],
+                            priceType: isVariantType ? "variant" : "single",
+                            regularprice: isVariantType ? "" : (effectiveRegularPrice > 0 ? String(effectiveRegularPrice) : ""),
+                            sellingprice: isVariantType ? "" : (effectiveSellingPrice > 0 ? String(effectiveSellingPrice) : ""),
+                            stock: isVariantType ? "" : String(stock),
+                            singleAttributes: isVariantType ? [] : singleAttributes,
+                            selectedAttributes,
+                            attributeInputs,
+                            variants: derivedVariants,
                             showPreview: false,
                             variantDisplayStyle: item.variantDisplayStyle || "list",
                         };
@@ -494,6 +635,7 @@ export async function POST(req: NextRequest) {
                         const infoFields: { name: string; value: string }[] = [
                             { name: "images", value: JSON.stringify(processedImages) },
                             { name: "image", value: processedImages[0] || "" },
+                            { name: "gallery", value: JSON.stringify(processedImages.slice(1)) },
                             { name: "shortDescription", value: String(rawShortDesc || "") },
                             { name: "description", value: String(rawDesc || "") },
                             { name: "_variate", value: JSON.stringify(variatePayload) },

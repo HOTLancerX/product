@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import connectDB from "@/lib/mongodb";
 import Post from "@/models/post";
 import PostInfo from "@/models/post_info";
+import { Settings } from "@/lib/settings";
 
 export const dynamic = "force-dynamic";
 
@@ -125,6 +126,33 @@ export async function GET(req: Request) {
             }
         })();
 
+        let aiConfig = {
+            provider: "gemini",
+            model: "gemini-2.5-flash",
+            providerName: "Gemini",
+        };
+
+        try {
+            const settings = await Settings();
+            const activeProvider = settings.product_ai_provider === "custom" ? "custom" : "gemini";
+            const customBaseUrl = settings.product_custom_base_url || "";
+            const isCustomOpenRouter = customBaseUrl.toLowerCase().includes("openrouter.ai");
+            const providerName = activeProvider === "custom"
+                ? (isCustomOpenRouter ? "OpenRouter" : "Custom AI")
+                : "Gemini";
+            const activeModel = activeProvider === "custom"
+                ? (settings.product_custom_model || settings.openai_model || "meta-llama/llama-3.3-70b-instruct")
+                : (settings.product_gemini_model || "gemini-2.5-flash");
+
+            aiConfig = {
+                provider: activeProvider,
+                model: activeModel,
+                providerName,
+            };
+        } catch {
+            // keep fallback aiConfig
+        }
+
         return NextResponse.json({
             posts: items,
             pagination: {
@@ -134,6 +162,7 @@ export async function GET(req: Request) {
                 totalPages: Math.ceil(total / limit) || 1,
                 totalMissingCount,
             },
+            aiConfig,
         });
     } catch (err: any) {
         console.error("Error fetching products for bulk short description:", err);

@@ -39,9 +39,9 @@ const TABS: Tab[] = [
     },
     {
         key:         "ai",
-        label:       "AI & Gemini",
+        label:       "AI Settings",
         icon:        "solar:magic-stick-3-bold",
-        description: "Configure Google Gemini API key and model for automated bulk product short descriptions.",
+        description: "Configure Google Gemini or Custom / OpenRouter AI engine for automated product short descriptions.",
     },
     {
         key:         "shipping",

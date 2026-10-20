@@ -14,20 +14,27 @@ important key feature include: like Display Type,Storage,RAM,Battery,Refresh Rat
 Don’t add Model Name, Brand in the key features
 Battery should have the watts
 <ul>
-  <li><b>Specification Name //1 words</b>: Specification detail 1 or 4 maximum wards</li>
-  <li><b>Specification Name //1 words</b>: Specification detail 1 or 4 maximum wards</li>
+  <li><b>Specification Name</b>: Specification detail (concise, 1 to 4 words)</li>
+  <li><b>Specification Name</b>: Specification detail (concise, 1 to 4 words)</li>
   ...
-</ul>`;
+</ul>
+Do NOT output comments, notes, or "//1 words" in the tag names or content.`;
 
 export const DEFAULT_NARRATIVE_PROMPT = `/human
 - online update information
-- short description should be natural, clear, and helpful.
-- Each short description should be friendly, and human-like.
-- Avoid robotic one-word short description.
-- most important: Do not mention price unless in the short description.
-- do not include title
+- Product description should be natural, engaging, clear, and informative.
+- Written in a friendly, human-like, and professional e-commerce copywriting tone.
+- Avoid robotic or repetitive phrasing.
+- Do not mention price unless specified.
+- Do not repeat the product title as an H1.
 
-Write exactly 200 to 300 words important short description based on the title.
-The output must be only valid HTML without any code fences, markdown, or extra formatting.
-include paragraph p,strong,i,h3,h4,span paragraph
-Do NOT include the words "html", "\`\`\`", "code", or any markdown fences.`;
+Write a compelling 200 to 300 words product description based on the title.
+The output must be ONLY clean, valid HTML markup (e.g. <p>, <h3>, <strong>, <span>).
+Structure with:
+1. An engaging opening overview paragraph (<p>).
+2. A key features / benefits section with subheadings (<h3>) and paragraphs.
+3. A concluding summary on reliability and user experience.
+Do NOT include markdown fences (\`\`\`html or \`\`\`), code blocks, or commentary.`;
+
+export const DEFAULT_FULL_DESCRIPTION_PROMPT = DEFAULT_NARRATIVE_PROMPT;
+

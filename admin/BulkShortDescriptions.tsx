@@ -56,6 +56,17 @@ export default function BulkShortDescriptions() {
     const [saveSuccessMessage, setSaveSuccessMessage] = useState("");
     const [errorMessage, setErrorMessage] = useState("");
 
+    // Active AI Engine Config (Gemini or Custom / OpenRouter)
+    const [aiConfig, setAiConfig] = useState<{
+        provider: "gemini" | "custom";
+        model: string;
+        providerName: string;
+    }>({
+        provider: "gemini",
+        model: "gemini-2.5-flash",
+        providerName: "Gemini",
+    });
+
     // Load available categories for filter
     useEffect(() => {
         fetch("/api/product/import")
@@ -88,6 +99,10 @@ export default function BulkShortDescriptions() {
                 setErrorMessage(data.error || "Failed to load products.");
                 setProducts([]);
                 return;
+            }
+
+            if (data.aiConfig) {
+                setAiConfig(data.aiConfig);
             }
 
             const items: ProductShortDescRow[] = (data.posts || []).map((p: any) => ({
@@ -172,7 +187,7 @@ export default function BulkShortDescriptions() {
 
             const data = await res.json();
             if (!res.ok) {
-                setErrorMessage(data.error || "Generation error from Gemini.");
+                setErrorMessage(data.error || `Generation error from ${aiConfig.providerName}.`);
                 setProducts((prev) =>
                     prev.map((p) => (p.id === item.id ? { ...p, isGenerating: false } : p))
                 );
@@ -196,7 +211,7 @@ export default function BulkShortDescriptions() {
                 );
             }
         } catch {
-            setErrorMessage("Network error during single product generation.");
+            setErrorMessage(`Network error during single product generation with ${aiConfig.providerName}.`);
             setProducts((prev) =>
                 prev.map((p) => (p.id === item.id ? { ...p, isGenerating: false } : p))
             );
@@ -234,7 +249,7 @@ export default function BulkShortDescriptions() {
             const data = await res.json();
 
             if (!res.ok) {
-                setErrorMessage(data.error || "Generation error from Gemini.");
+                setErrorMessage(data.error || `Generation error from ${aiConfig.providerName}.`);
                 setProducts((prev) =>
                     prev.map((p) => (p.selected ? { ...p, isGenerating: false, error: data.error } : p))
                 );
@@ -261,10 +276,10 @@ export default function BulkShortDescriptions() {
                 })
             );
 
-            setSaveSuccessMessage(`Generated human-style short descriptions for ${targetProducts.length} products!`);
+            setSaveSuccessMessage(`Generated short descriptions for ${targetProducts.length} products using ${aiConfig.providerName}!`);
             setTimeout(() => setSaveSuccessMessage(""), 3500);
         } catch (err: any) {
-            setErrorMessage(err?.message || "Network error while generating batch.");
+            setErrorMessage(err?.message || `Network error while generating batch with ${aiConfig.providerName}.`);
             setProducts((prev) => prev.map((p) => ({ ...p, isGenerating: false })));
         } finally {
             setIsGenerating(false);
@@ -281,7 +296,7 @@ export default function BulkShortDescriptions() {
             }));
 
         if (itemsToSave.length === 0) {
-            alert("No short descriptions found to save. Click 'Generate All with Gemini' first.");
+            alert(`No short descriptions found to save. Click 'Generate All with ${aiConfig.providerName}' first.`);
             return;
         }
 
@@ -327,8 +342,15 @@ export default function BulkShortDescriptions() {
             <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-gray-100 shadow-xs">
                 <div>
                     <div className="flex items-center gap-2 mb-1">
-                        <div className="w-8 h-8 rounded-lg bg-emerald-100 flex items-center justify-center text-emerald-600">
-                            <Icon icon="solar:magic-stick-3-bold" width={20} />
+                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+                            aiConfig.provider === "custom"
+                                ? "bg-indigo-100 text-indigo-600"
+                                : "bg-emerald-100 text-emerald-600"
+                        }`}>
+                            <Icon
+                                icon={aiConfig.provider === "custom" ? "solar:cpu-bolt-bold" : "solar:magic-stick-3-bold"}
+                                width={20}
+                            />
                         </div>
                         <h1 className="text-xl font-bold text-gray-900">Bulk Product Short Descriptions & Specs</h1>
                         <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
@@ -336,17 +358,24 @@ export default function BulkShortDescriptions() {
                         </span>
                     </div>
                     <p className="text-xs text-gray-500">
-                        Generate human-style 8 product specifications or narrative short descriptions using Gemini in 1 request, review, and save all at once.
+                        Generate human-style specifications or short descriptions using active <strong>{aiConfig.providerName}</strong> ({aiConfig.model}) in 1 request, review, and save all at once.
                     </p>
                 </div>
 
                 <div className="flex items-center gap-3">
                     <Link
                         href="/admin/product/settings"
-                        className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-medium text-gray-600 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl transition"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-700 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl transition shadow-2xs"
                     >
-                        <Icon icon="logos:google-gemini" width={14} />
-                        AI Settings
+                        {aiConfig.provider === "custom" ? (
+                            <Icon icon="solar:cpu-bolt-bold" width={14} className="text-indigo-600" />
+                        ) : (
+                            <Icon icon="logos:google-gemini" width={14} />
+                        )}
+                        <span className="font-semibold text-gray-800">{aiConfig.providerName}</span>
+                        <span className="text-[11px] font-mono text-gray-500 max-w-28 truncate font-normal">
+                            {aiConfig.model}
+                        </span>
                     </Link>
                     <button
                         type="button"
@@ -471,7 +500,11 @@ export default function BulkShortDescriptions() {
                         type="button"
                         onClick={handleGenerateAllAtOnce}
                         disabled={selectedCount === 0 || loading || isGenerating || isSaving}
-                        className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-linear-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white text-xs font-semibold transition shadow-xs disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                        className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-white text-xs font-semibold transition shadow-xs disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer ${
+                            aiConfig.provider === "custom"
+                                ? "bg-linear-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700"
+                                : "bg-linear-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700"
+                        }`}
                     >
                         {isGenerating ? (
                             <>
@@ -480,8 +513,11 @@ export default function BulkShortDescriptions() {
                             </>
                         ) : (
                             <>
-                                <Icon icon="solar:magic-stick-3-bold" width={16} />
-                                Generate All with Gemini ({selectedCount})
+                                <Icon
+                                    icon={aiConfig.provider === "custom" ? "solar:cpu-bolt-bold" : "solar:magic-stick-3-bold"}
+                                    width={16}
+                                />
+                                Generate All with {aiConfig.providerName} ({selectedCount})
                             </>
                         )}
                     </button>
@@ -520,7 +556,7 @@ export default function BulkShortDescriptions() {
                         <div className="flex items-start gap-2">
                             <Icon icon="solar:danger-triangle-bold" width={18} className="text-red-600 shrink-0 mt-0.5" />
                             <div>
-                                <p className="font-bold text-red-900">Gemini Generation Error</p>
+                                <p className="font-bold text-red-900">{aiConfig.providerName} Generation Error</p>
                                 <p className="text-red-700 mt-0.5 leading-relaxed wrap-break-word font-mono text-[11px] max-h-36 overflow-y-auto pr-1">
                                     {errorMessage}
                                 </p>
@@ -537,12 +573,12 @@ export default function BulkShortDescriptions() {
 
                     {errorMessage.includes("429") || errorMessage.toLowerCase().includes("quota") ? (
                         <div className="pt-2 border-t border-red-200/60 flex items-center justify-between">
-                            <span className="text-[11px] text-red-700">Model quota exhausted. Switch to standard model:</span>
+                            <span className="text-[11px] text-red-700">Model quota exhausted or rate limited. Switch model or engine in settings:</span>
                             <Link
                                 href="/admin/product/settings"
                                 className="px-2.5 py-1 text-[11px] font-bold bg-red-600 hover:bg-red-700 text-white rounded-lg transition"
                             >
-                                Change Model in Settings
+                                Change in AI Settings
                             </Link>
                         </div>
                     ) : null}
@@ -697,10 +733,17 @@ export default function BulkShortDescriptions() {
                                                     type="button"
                                                     onClick={() => handleGenerateSingle(product)}
                                                     disabled={product.isGenerating || isGenerating || isSaving}
-                                                    title="Generate with Gemini"
-                                                    className="p-1.5 text-emerald-600 hover:text-emerald-800 hover:bg-emerald-50 rounded-lg transition disabled:opacity-40 cursor-pointer"
+                                                    title={`Generate with ${aiConfig.providerName}`}
+                                                    className={`p-1.5 rounded-lg transition disabled:opacity-40 cursor-pointer ${
+                                                        aiConfig.provider === "custom"
+                                                            ? "text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50"
+                                                            : "text-emerald-600 hover:text-emerald-800 hover:bg-emerald-50"
+                                                    }`}
                                                 >
-                                                    <Icon icon="solar:magic-stick-3-bold" width={16} />
+                                                    <Icon
+                                                        icon={aiConfig.provider === "custom" ? "solar:cpu-bolt-bold" : "solar:magic-stick-3-bold"}
+                                                        width={16}
+                                                    />
                                                 </button>
                                             </td>
                                         </tr>

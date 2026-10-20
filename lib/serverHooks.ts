@@ -24,7 +24,9 @@ import Post from "@/models/post";
 import PostInfo from "@/models/post_info";
 import Cat from "@/models/cat";
 import Comment from "@/models/Comment";
+import Permalink from "@/models/permalink";
 import { Settings } from "@/lib/settings";
+import { getSmartFrequentlyTogether } from "./recommendations";
 
 // ── Category types ────────────────────────────────────────────────────────────
 
@@ -202,6 +204,18 @@ registerServerDataHook("product", async (id, _slug, data) => {
         }
     } catch { /* non-critical */ }
 
+    // ── Frequently Bought Together / Complete Your Setup (Dynamic Smart Auto-Suggest) ──
+    let frequentlyTogether: any[] = [];
+    try {
+        const lastAncestor = ancestors.length > 0 ? ancestors[ancestors.length - 1] : null;
+        frequentlyTogether = await getSmartFrequentlyTogether({
+            id: String(id),
+            title: String(data?.title ?? ""),
+            brandTitle: brand?.title,
+            categoryTitle: lastAncestor?.title,
+        });
+    } catch { /* non-critical */ }
+
     // Base pageData — other plugins enrich via registerProductEnricher()
     const base: Record<string, any> = {
         ancestors,
@@ -209,6 +223,7 @@ registerServerDataHook("product", async (id, _slug, data) => {
         brand,
         compareProducts:   [],
         categoryProducts,
+        frequentlyTogether,
         flashSaleCampaign: null,
         reviewsData,
     };

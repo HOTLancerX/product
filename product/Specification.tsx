@@ -10,6 +10,7 @@ interface SpecificationField {
 
 interface SpecificationBox {
     title: string;
+    icon?: string;
     fields: SpecificationField[];
 }
 
@@ -248,8 +249,11 @@ function AccordionBox({ box, defaultOpen = false }: { box: SpecificationBox; def
                 onClick={() => setIsOpen(!isOpen)}
                 className="w-full flex items-center justify-between p-3 bg-gray-50 hover:bg-gray-100 transition-colors"
             >
-                <h3 className="text-lg font-semibold text-gray-800">{box.title}</h3>
-                <Icon icon={isOpen ? 'mdi:chevron-up' : 'mdi:chevron-down'} width="24" height="24" className="text-gray-600" />
+                <div className="flex items-center gap-2.5">
+                    {box.icon && <Icon icon={box.icon} width="20" height="20" className="text-blue-600 shrink-0" />}
+                    <h3 className="text-lg font-semibold text-gray-800">{box.title}</h3>
+                </div>
+                <Icon icon={isOpen ? 'mdi:chevron-up' : 'mdi:chevron-down'} width="24" height="24" className="text-gray-600 shrink-0" />
             </button>
             {isOpen && (
                 <div className="bg-white">

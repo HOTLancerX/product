@@ -46,6 +46,7 @@ interface PreviewProduct {
     brand?: string;
     status: string;
     sku?: string;
+    attributesCount?: number;
     warnings: string[];
 }
 
@@ -61,6 +62,9 @@ interface ImportProgress {
 const SAMPLE_PRODUCT_JSON = [
     {
         img: "https://cdnnew.selfeb.com/images/view/selfeb-a7a45051-77d8-476e-b347-5aec458c8582-1769523231652.jpg",
+        gallery: [
+            "https://cdnnew.selfeb.com/images/view/selfeb-ae08cad8-ca5a-4740-85f4-095c38b1bb9a-1768184069754.jpg"
+        ],
         title: "Premium Combo-4",
         unit: "Big",
         price: "3520",
@@ -70,6 +74,7 @@ const SAMPLE_PRODUCT_JSON = [
     },
     {
         img: "https://cdnnew.selfeb.com/images/view/selfeb-ae08cad8-ca5a-4740-85f4-095c38b1bb9a-1768184069754.jpg",
+        gallery: [],
         title: "Premium Combo-1",
         unit: "Big",
         price: "4350",
@@ -135,43 +140,69 @@ function normalizeImages(val: any): string[] {
 }
 
 function extractImagesFromItem(item: any, imageKey?: string, galleryKey?: string): string[] {
-    const collected: string[] = [];
+    const coverImages: string[] = [];
+    const galleryImages: string[] = [];
 
-    if (imageKey && item[imageKey] !== undefined) {
-        collected.push(...normalizeImages(item[imageKey]));
-    }
-    if (galleryKey && item[galleryKey] !== undefined) {
-        collected.push(...normalizeImages(item[galleryKey]));
-    }
-
-    if (collected.length === 0) {
-        const aliases = [
-            "img",
-            "image",
-            "images",
-            "photo",
-            "photos",
-            "thumbnail",
-            "thumb",
-            "pic",
-            "picture",
-            "src",
-            "cover",
-            "coverImage",
-            "gallery",
-        ];
-        for (const alias of aliases) {
+    // 1. Extract cover / main image
+    if (imageKey && item[imageKey] !== undefined && item[imageKey] !== null && item[imageKey] !== "") {
+        coverImages.push(...normalizeImages(item[imageKey]));
+    } else {
+        const coverAliases = ["cover", "coverImage", "image", "img", "thumbnail", "thumb", "picture", "pic", "photo", "images"];
+        for (const alias of coverAliases) {
             if (item[alias] !== undefined && item[alias] !== null && item[alias] !== "") {
                 const norm = normalizeImages(item[alias]);
                 if (norm.length > 0) {
-                    collected.push(...norm);
+                    coverImages.push(...norm);
                     break;
                 }
             }
         }
     }
 
-    return Array.from(new Set(collected));
+    // 2. Extract gallery images
+    if (galleryKey && item[galleryKey] !== undefined && item[galleryKey] !== null && item[galleryKey] !== "") {
+        galleryImages.push(...normalizeImages(item[galleryKey]));
+    } else {
+        const galleryAliases = ["gallery", "gallery_images", "additional_images", "extra_images", "photos", "pictures"];
+        for (const alias of galleryAliases) {
+            // Avoid re-reading the exact same property that was picked for cover
+            if (alias !== imageKey && item[alias] !== undefined && item[alias] !== null && item[alias] !== "") {
+                const norm = normalizeImages(item[alias]);
+                if (norm.length > 0) {
+                    galleryImages.push(...norm);
+                    break;
+                }
+            }
+        }
+    }
+
+    // 3. Extra check: if raw_images exists (e.g. from crawler or WooCommerce)
+    if (Array.isArray(item.raw_images) && item.raw_images.length > 1) {
+        const rawNorm = normalizeImages(item.raw_images);
+        if (rawNorm.length > 1) {
+            galleryImages.push(...rawNorm.slice(1));
+        }
+    }
+
+    // 4. Primary cover is the first cover image (or first gallery image if no cover)
+    const primaryCover = coverImages[0] || galleryImages[0] || "";
+    // Any secondary images from coverImages belong to gallery
+    const extraCover = coverImages.slice(1);
+
+    // 5. Combine: Index 0 is Featured Image, Index 1..N are Gallery Images (matching PostForm.tsx)
+    const combined = [primaryCover, ...galleryImages, ...extraCover].filter(Boolean);
+
+    // Deduplicate while preserving index 0
+    const seen = new Set<string>();
+    const result: string[] = [];
+    for (const url of combined) {
+        if (!seen.has(url)) {
+            seen.add(url);
+            result.push(url);
+        }
+    }
+
+    return result;
 }
 
 function extractValue(item: any, customKey: string | undefined, aliases: string[]): any {
@@ -355,6 +386,11 @@ export default function ProductImportPage() {
             const displayCategory = selectedCategoryObj ? selectedCategoryObj.title : (rawCat || "");
             const displayBrand = selectedBrandObj ? selectedBrandObj.title : (rawBrand || "");
 
+            const attrCount = Array.isArray(item.attributes)
+                ? item.attributes.length
+                : (Array.isArray(item.singleAttributes) ? item.singleAttributes.length : 0) +
+                  (Array.isArray(item.selectedAttributes) ? item.selectedAttributes.length : 0);
+
             return {
                 title: title || "(Untitled Product)",
                 slug,
@@ -367,6 +403,7 @@ export default function ProductImportPage() {
                 brand: displayBrand,
                 status: item.status || defaultStatus,
                 sku: rawSku,
+                attributesCount: attrCount,
                 warnings,
             };
         });
@@ -815,6 +852,26 @@ export default function ProductImportPage() {
                             </select>
                         </div>
 
+                        {/* Gallery Key */}
+                        <div className="space-y-1">
+                            <label className="text-xs font-bold text-gray-700 flex items-center justify-between">
+                                <span>Gallery Images</span>
+                                <span className="text-[10px] text-emerald-600 font-semibold font-mono">{mapping.galleryKey || "auto"}</span>
+                            </label>
+                            <select
+                                value={mapping.galleryKey}
+                                onChange={(e) => setMapping((prev) => ({ ...prev, galleryKey: e.target.value }))}
+                                className="w-full px-3 py-2 text-xs font-semibold bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:bg-white"
+                            >
+                                <option value="">Auto Detect (gallery / additional_images)</option>
+                                {detectedKeys.map((k) => (
+                                    <option key={k} value={k}>
+                                        {k}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+
                         {/* Price Key */}
                         <div className="space-y-1">
                             <label className="text-xs font-bold text-gray-700 flex items-center justify-between">
@@ -1014,12 +1071,22 @@ export default function ProductImportPage() {
                                         <td className="p-3 text-gray-400 font-mono">{idx + 1}</td>
                                         <td className="p-3">
                                             {p.images[0] ? (
-                                                // eslint-disable-next-line @next/next/no-img-element
-                                                <img
-                                                    src={p.images[0]}
-                                                    alt={p.title}
-                                                    className="w-12 h-12 object-cover rounded-lg border border-gray-200 shadow-2xs"
-                                                />
+                                                <div className="relative inline-block">
+                                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                    <img
+                                                        src={p.images[0]}
+                                                        alt={p.title}
+                                                        className="w-12 h-12 object-cover rounded-lg border border-gray-200 shadow-2xs"
+                                                    />
+                                                    {p.images.length > 1 && (
+                                                        <span
+                                                            title={`${p.images.length - 1} gallery image(s)`}
+                                                            className="absolute -bottom-1 -right-1 bg-gray-900/85 text-white text-[9px] font-bold px-1.5 py-0.2 rounded-full border border-white shadow-xs"
+                                                        >
+                                                            +{p.images.length - 1}
+                                                        </span>
+                                                    )}
+                                                </div>
                                             ) : (
                                                 <div className="w-12 h-12 rounded-lg bg-gray-100 flex items-center justify-center text-gray-400">
                                                     <Icon icon="solar:gallery-bold" width={20} />
@@ -1028,7 +1095,15 @@ export default function ProductImportPage() {
                                         </td>
                                         <td className="p-3">
                                             <p className="font-bold text-gray-900 line-clamp-1">{p.title}</p>
-                                            <p className="font-mono text-[11px] text-gray-400">{p.slug}</p>
+                                            <div className="flex items-center gap-1.5 mt-0.5">
+                                                <p className="font-mono text-[11px] text-gray-400">{p.slug}</p>
+                                                {Boolean(p.attributesCount && p.attributesCount > 0) && (
+                                                    <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-800 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200">
+                                                        <Icon icon="solar:tag-bold" width={11} />
+                                                        {p.attributesCount} {p.attributesCount === 1 ? 'attr' : 'attrs'}
+                                                    </span>
+                                                )}
+                                            </div>
                                         </td>
                                         <td className="p-3 whitespace-nowrap">
                                             <span className="font-bold text-emerald-700">৳{p.sellingPrice.toLocaleString()}</span>

@@ -36,6 +36,7 @@ import Header4 from "./header/Header1";
 import Header2 from "./header/Header2";
 import ProductImportPage from "./admin/ImportPage";
 import BulkShortDescriptions from "./admin/BulkShortDescriptions";
+import BulkDescriptions from "./admin/BulkDescriptions";
 
 // ─── Plugin metadata ───────────────────────────────────────────────────────────
 export const PLUGINS: PluginMeta = {
@@ -179,6 +180,14 @@ export function register() {
             slug: "product/short-descriptions",
             parent: "product",
             position: 6.5,
+        },
+        {
+            key: "product-desc",
+            label: "Bulk Description",
+            icon: "solar:document-text-bold",
+            slug: "product/descriptions",
+            parent: "product",
+            position: 6.6,
         },
         {
             key: "product-reviews",
@@ -673,6 +682,13 @@ export function register() {
             style: "left",
             position: 26,
             path: BulkShortDescriptions,
+        },
+        {
+            key: "product/descriptions",
+            label: "Bulk Product Descriptions",
+            style: "left",
+            position: 26.5,
+            path: BulkDescriptions,
         },
     ], PLUGINS.nx);
 

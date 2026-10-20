@@ -247,8 +247,8 @@ export default function FilterPanel({
                     {renderPriceInputs()}
                 </div>
             )}
-            {attributeOptions.map((attr) => (
-                <div key={attr.id}>
+            {attributeOptions.map((attr, idx) => (
+                <div key={`${attr.id}-${idx}`}>
                     <h3 className="text-sm font-semibold mb-1 text-gray-800">{attr.label}</h3>
                     {renderCheckboxList(attr)}
                 </div>
@@ -268,8 +268,8 @@ export default function FilterPanel({
                     {openSections['price'] && renderPriceInputs()}
                 </div>
             )}
-            {attributeOptions.map((attr) => (
-                <div key={attr.id} className="py-2">
+            {attributeOptions.map((attr, idx) => (
+                <div key={`${attr.id}-${idx}`} className="py-2">
                     <SectionHeader label={attr.label} isOpen={openSections[attr.id]}
                         onToggle={() => setOpenSections(p => ({ ...p, [attr.id]: !p[attr.id] }))}
                         count={(activeFilters[attr.id] || []).length} />
@@ -291,8 +291,8 @@ export default function FilterPanel({
                     {openSection === 'price' && renderPriceInputs()}
                 </div>
             )}
-            {attributeOptions.map((attr) => (
-                <div key={attr.id} className="py-2">
+            {attributeOptions.map((attr, idx) => (
+                <div key={`${attr.id}-${idx}`} className="py-2">
                     <SectionHeader label={attr.label} isOpen={openSection === attr.id}
                         onToggle={() => setOpenSection(p => p === attr.id ? '' : attr.id)}
                         count={(activeFilters[attr.id] || []).length} />
@@ -318,8 +318,8 @@ export default function FilterPanel({
                     <div className="w-52">{renderPriceInputs()}</div>
                 </DropdownItem>
             )}
-            {attributeOptions.map((attr) => (
-                <DropdownItem key={attr.id} label={attr.label}
+            {attributeOptions.map((attr, idx) => (
+                <DropdownItem key={`${attr.id}-${idx}`} label={attr.label}
                     count={(activeFilters[attr.id] || []).length}>
                     {renderCheckboxList(attr)}
                 </DropdownItem>

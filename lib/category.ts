@@ -72,9 +72,10 @@ export async function getCategoryPageData(
 /** All published products in this category and every descendant sub-category */
 async function getProductsInCategory(catId: string): Promise<CategoryProduct[]> {
     const allCatIds = await getDescendantIds(catId);
+    const allCatIdStrings = allCatIds.map(id => String(id));
 
     const posts = await Post.find({
-        category: { $in: allCatIds },
+        category: { $in: [...allCatIds, ...allCatIdStrings] },
         type:     "product",
         status:   "published",
     }).lean() as any[];
@@ -243,13 +244,27 @@ async function getAttributeOptions(catId: string): Promise<AttributeOption[]> {
 
         if (labelMap.size === 0) return [];
 
-        // 4. Build AttributeOption[] — id is a stable URL-safe slug from the label
-        const results: AttributeOption[] = [];
+        // 4. Build AttributeOption[] — group by unique slug id and merge values to prevent duplicate keys
+        const byId = new Map<string, { id: string; label: string; values: Set<string> }>();
         for (const [label, valueSet] of labelMap) {
-            const values = [...valueSet].sort();
-            if (values.length === 0) continue;
+            if (valueSet.size === 0) continue;
             const id = label.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-            results.push({ id, label, values });
+            if (!id) continue;
+            if (!byId.has(id)) {
+                byId.set(id, { id, label, values: new Set(valueSet) });
+            } else {
+                const existing = byId.get(id)!;
+                valueSet.forEach(v => existing.values.add(v));
+            }
+        }
+
+        const results: AttributeOption[] = [];
+        for (const item of byId.values()) {
+            results.push({
+                id: item.id,
+                label: item.label,
+                values: [...item.values].sort(),
+            });
         }
 
         // Sort groups alphabetically by label
@@ -264,19 +279,32 @@ async function getAttributeOptions(catId: string): Promise<AttributeOption[]> {
 
 /** Recursively collect catId + all descendant category ObjectIds */
 async function getDescendantIds(catId: string): Promise<mongoose.Types.ObjectId[]> {
-    const result: mongoose.Types.ObjectId[] = [new mongoose.Types.ObjectId(catId)];
-    const queue = [catId];
+    const rootId = mongoose.Types.ObjectId.isValid(catId) ? new mongoose.Types.ObjectId(catId) : null;
+    if (!rootId) return [];
+
+    const result: mongoose.Types.ObjectId[] = [rootId];
+    const queue = [String(rootId)];
+    const visited = new Set<string>([String(rootId)]);
 
     while (queue.length > 0) {
         const parentId = queue.shift()!;
+        const parentObjectId = mongoose.Types.ObjectId.isValid(parentId) ? new mongoose.Types.ObjectId(parentId) : null;
+
+        const orConditions: any[] = [{ parentId }];
+        if (parentObjectId) orConditions.push({ parentId: parentObjectId });
+
         const children = await Cat
-            .find({ parentId: new mongoose.Types.ObjectId(parentId) })
+            .find({ $or: orConditions })
             .select("_id")
             .lean() as any[];
 
         for (const c of children) {
-            result.push(c._id);
-            queue.push(String(c._id));
+            const sid = String(c._id);
+            if (!visited.has(sid)) {
+                visited.add(sid);
+                result.push(c._id);
+                queue.push(sid);
+            }
         }
     }
 
