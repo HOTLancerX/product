@@ -17,6 +17,7 @@
 
 import { registerServerDataHook, runProductEnrichers, runCategoryEnrichers } from "@/hook/serverDataHooks";
 import { getCategoryPageData, getCategoryAncestors } from "./category";
+import { getBrandPageData } from "./brand";
 import connectDB from "@/lib/mongodb";
 import User from "@/models/Users";
 import UserInfo from "@/models/Users_info";
@@ -35,7 +36,8 @@ registerServerDataHook("product-category", async (catId, catSlug, catData) => {
 });
 
 registerServerDataHook("brands", async (catId, catSlug, catData) => {
-    const base = await getCategoryPageData(catId, catSlug);
+    const subCategorySlug = (catData as any)?.subCategorySlug || null;
+    const base = await getBrandPageData(catId, catSlug, subCategorySlug);
     return runCategoryEnrichers(base as unknown as Record<string, any>, catData ?? { _id: catId, slug: catSlug });
 });
 
@@ -115,16 +117,25 @@ registerServerDataHook("product", async (id, _slug, data) => {
     }
 
     // ── Brand Info ────────────────────────────────────────────────────────
-    const brandId = data?.info?.brand || data?.info?.brandId || (data as any)?.brand;
-    let brand: { _id: string; title: string; slug: string } | null = null;
-    if (brandId) {
+    let rawBrand = (data as any)?.brands || (data as any)?.brand || data?.info?.brand || data?.info?.brandId;
+    if (typeof rawBrand === "string" && rawBrand.startsWith("{")) {
         try {
-            let catDoc = await Cat.findOne({ _id: brandId, type: "brands" }).lean() as any;
+            const parsed = JSON.parse(rawBrand);
+            rawBrand = parsed.id || rawBrand;
+        } catch { /* keep */ }
+    }
+    let brand: { _id: string; title: string; slug: string } | null = null;
+    if (rawBrand) {
+        try {
+            let catDoc = await Cat.findOne({ _id: rawBrand, type: "brands" }).lean() as any;
             if (!catDoc) {
-                catDoc = await Cat.findOne({ slug: String(brandId), type: "brands" }).lean() as any;
+                catDoc = await Cat.findOne({ slug: String(rawBrand), type: "brands" }).lean() as any;
             }
             if (!catDoc) {
-                catDoc = await Cat.findOne({ title: String(brandId), type: "brands" }).lean() as any;
+                catDoc = await Cat.findOne({ title: String(rawBrand), type: "brands" }).lean() as any;
+            }
+            if (!catDoc) {
+                catDoc = await Cat.findOne({ _id: rawBrand }).lean() as any;
             }
             if (catDoc) {
                 brand = {

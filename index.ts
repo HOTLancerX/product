@@ -27,6 +27,7 @@ import ProductLayout1 from "./product/Layout1";
 import ProductLayout2 from "./product/Layout2";
 import ProductCategoryLayout1 from "./product-category/Layout1";
 import ProductCategoryLayout2 from "./product-category/Layout2";
+import ProductBrandLayout from "./product-brand/Layout";
 import Variate from "./variate/Variate";
 import PostSpecification from "./variate/PostSpecification";
 import ProductSettingsPage from "./settings/ProductSettingsPage";
@@ -467,7 +468,7 @@ export function register() {
         },
     ], PLUGINS.nx);
 
-    // ─── Product category page templates ───────────────────────────────────
+    // ─── Product category & brand page templates ───────────────────────────
     addHook("root.pages", [
         {
             key: "product-category",
@@ -488,6 +489,16 @@ export function register() {
             position: 20,
             active: true,
             component: ProductCategoryLayout2,
+        },
+        {
+            key: "product-brand-1",
+            label: "Brand 1",
+            type: "brands",
+            slug: "dynamic",
+            style: "left",
+            position: 10,
+            active: true,
+            component: ProductBrandLayout,
         },
     ], PLUGINS.nx);
 
