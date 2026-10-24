@@ -104,10 +104,16 @@ export async function getBrandPageData(
         .limit(300)
         .lean() as any[];
 
-    // 3. Batch-fetch postinfos for all found posts
+    // 3. Batch-fetch card-relevant postinfos for found posts
     const postIds = rawPosts.map((p) => p._id);
+    const BRAND_CARD_FIELDS = [
+        "_variate", "images", "image", "thumbnail", "featured_image", "_thumbnail_id",
+        "regularPrice", "salePrice", "price", "shortDescription", "badge",
+        "rating", "reviews", "shipping_inside", "shipping_outside", "brand", "brands"
+    ];
     const infoRecords = await PostInfo.find({
         postId: { $in: postIds },
+        name: { $in: BRAND_CARD_FIELDS },
     }).lean() as any[];
 
     const infoByPost: Record<string, Record<string, string>> = {};

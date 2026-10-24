@@ -72,7 +72,7 @@ export function ProductRelatedClient({
         <div className="aspect-square bg-gray-50 rounded-lg overflow-hidden relative mb-3">
           <img src={img || "https://images.unsplash.com/photo-1523275335684-37898b6baf30?q=80&w=400"} alt={item.title} className="w-full h-full object-cover" />
         </div>
-        <h4 className="font-semibold text-sm text-gray-800 line-clamp-2 min-h-[40px]">{item.title}</h4>
+        <h4 className="font-semibold text-sm text-gray-800 line-clamp-2 min-h-10">{item.title}</h4>
         <div className="mt-auto pt-2 flex items-center justify-between">
           <span className="font-bold text-emerald-600">{price}</span>
         </div>
