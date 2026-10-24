@@ -66,18 +66,24 @@ registerServerDataHook("product", async (id, _slug, data) => {
     await connectDB();
 
     const categoryId = data?.category ? String(data.category) : null;
-
-    // ── Always: category breadcrumb ancestors (cached) ────────────────────
-    const ancestors = categoryId
-        ? await withCache(`cat:ancestors:${categoryId}`, () => getCategoryAncestors(categoryId))()
-        : [];
-
-    // ── Always: seller info (cached) ──────────────────────────────────────
     const userIdInfo = data?.info?.userId as string | undefined;
-    let seller: Record<string, string> | null = null;
 
-    if (userIdInfo) {
-        seller = await withCache(`user:seller:${userIdInfo}`, async () => {
+    let rawBrand = (data as any)?.brands || (data as any)?.brand || data?.info?.brand || data?.info?.brandId;
+    if (typeof rawBrand === "string" && rawBrand.startsWith("{")) {
+        try {
+            const parsed = JSON.parse(rawBrand);
+            rawBrand = parsed.id || rawBrand;
+        } catch { /* keep */ }
+    }
+
+    // ── 1. Category breadcrumb ancestors (cached) ─────────────────────────
+    const ancestorsPromise = categoryId
+        ? withCache(`cat:ancestors:${categoryId}`, () => getCategoryAncestors(categoryId))()
+        : Promise.resolve([]);
+
+    // ── 2. Seller info (cached) ───────────────────────────────────────────
+    const sellerPromise = userIdInfo
+        ? withCache(`user:seller:${userIdInfo}`, async () => {
             try {
                 const sellerUser = await User.findById(userIdInfo).lean() as any;
                 if (!sellerUser) return null;
@@ -98,23 +104,21 @@ registerServerDataHook("product", async (id, _slug, data) => {
             } catch {
                 return null;
             }
-        })();
-    }
+        })()
+        : Promise.resolve(null);
 
-    // ── Related products in same category (cached + card-fields only) ─────
-    let categoryProducts: any[] = [];
-    if (categoryId) {
-        categoryProducts = await withCache(`product:related:${categoryId}:${id}`, async () => {
+    // ── 3. Related products in same category (shared category cache) ─────
+    const categoryProductsPromise = categoryId
+        ? withCache(`cat:related_products:${categoryId}`, async () => {
             try {
                 const settingsObj = await Settings();
-                const limit = Math.min(16, Math.max(4, parseInt((settingsObj?.related_products_total as string) ?? "12", 10) || 12));
+                const limit = Math.min(20, Math.max(6, parseInt((settingsObj?.related_products_total as string) ?? "12", 10) || 12));
 
                 const catPosts = await Post.find({
                     category: categoryId,
                     type: "product",
                     status: "published",
-                    _id: { $ne: id },
-                }).limit(limit).lean() as any[];
+                }).limit(limit + 1).lean() as any[];
 
                 if (catPosts.length === 0) return [];
 
@@ -145,20 +149,12 @@ registerServerDataHook("product", async (id, _slug, data) => {
             } catch {
                 return [];
             }
-        })();
-    }
+        })().then((list: any[]) => (list || []).filter((p: any) => String(p._id) !== String(id)).slice(0, 12))
+        : Promise.resolve([]);
 
-    // ── Brand Info (cached) ───────────────────────────────────────────────
-    let rawBrand = (data as any)?.brands || (data as any)?.brand || data?.info?.brand || data?.info?.brandId;
-    if (typeof rawBrand === "string" && rawBrand.startsWith("{")) {
-        try {
-            const parsed = JSON.parse(rawBrand);
-            rawBrand = parsed.id || rawBrand;
-        } catch { /* keep */ }
-    }
-    let brand: { _id: string; title: string; slug: string } | null = null;
-    if (rawBrand) {
-        brand = await withCache(`cat:brand:${rawBrand}`, async () => {
+    // ── 4. Brand Info (cached) ────────────────────────────────────────────
+    const brandPromise = rawBrand
+        ? withCache(`cat:brand:${rawBrand}`, async () => {
             try {
                 let catDoc = await Cat.findOne({ _id: rawBrand, type: "brands" }).lean() as any;
                 if (!catDoc) {
@@ -181,11 +177,11 @@ registerServerDataHook("product", async (id, _slug, data) => {
             } catch {
                 return null;
             }
-        })();
-    }
+        })()
+        : Promise.resolve(null);
 
-    // ── Approved Product Reviews & Rating Summary (cached) ─────────────────
-    const reviewsData = await withCache(`product:reviews:${id}`, async () => {
+    // ── 5. Approved Product Reviews & Rating Summary (cached) ─────────────
+    const reviewsPromise = withCache(`product:reviews:${id}`, async () => {
         let initialData: {
             reviews: any[];
             averageRating: number;
@@ -254,6 +250,15 @@ registerServerDataHook("product", async (id, _slug, data) => {
         return initialData;
     })();
 
+    // Run all 5 sub-queries in parallel
+    const [ancestors, seller, categoryProducts, brand, reviewsData] = await Promise.all([
+        ancestorsPromise,
+        sellerPromise,
+        categoryProductsPromise,
+        brandPromise,
+        reviewsPromise,
+    ]);
+
     // Base pageData — other plugins (e.g. gadgets, compare, flash-sale) enrich via registerProductEnricher()
     const base: Record<string, any> = {
         ancestors,
@@ -267,6 +272,5 @@ registerServerDataHook("product", async (id, _slug, data) => {
     };
 
     // Run all registered product enrichers (compare, flash-sale, etc.)
-    // Each enricher receives the accumulating pageData + raw postData
     return runProductEnrichers(base, { ...data, _id: id });
 });
