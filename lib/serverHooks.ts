@@ -64,7 +64,8 @@ registerServerDataHook("brands", async (catId, catSlug, catData) => {
 // ── Product post type ─────────────────────────────────────────────────────────
 
 registerServerDataHook("product", async (id, _slug, data) => {
-    await connectDB();
+    return withCache(`product:full_page_data:${id}`, async () => {
+        await connectDB();
 
     const categoryId = (data?.category || data?.info?.category || data?.info?.categoryId)
         ? String(data?.category || data?.info?.category || data?.info?.categoryId)
@@ -322,6 +323,7 @@ registerServerDataHook("product", async (id, _slug, data) => {
         reviewsData,
     };
 
-    // Run all registered product enrichers (compare, flash-sale, etc.)
-    return runProductEnrichers(base, { ...data, _id: id });
+        // Run all registered product enrichers (compare, flash-sale, etc.)
+        return runProductEnrichers(base, { ...data, _id: id });
+    })();
 });
