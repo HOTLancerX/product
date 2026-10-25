@@ -19,6 +19,7 @@ import { registerServerDataHook, runProductEnrichers, runCategoryEnrichers } fro
 import { getCategoryPageData, getCategoryAncestors } from "./category";
 import { getBrandPageData } from "./brand";
 import connectDB from "@/lib/mongodb";
+import mongoose from "mongoose";
 import User from "@/models/Users";
 import UserInfo from "@/models/Users_info";
 import Post from "@/models/post";
@@ -65,7 +66,9 @@ registerServerDataHook("brands", async (catId, catSlug, catData) => {
 registerServerDataHook("product", async (id, _slug, data) => {
     await connectDB();
 
-    const categoryId = data?.category ? String(data.category) : null;
+    const categoryId = (data?.category || data?.info?.category || data?.info?.categoryId)
+        ? String(data?.category || data?.info?.category || data?.info?.categoryId)
+        : null;
     const userIdInfo = data?.info?.userId as string | undefined;
 
     let rawBrand = (data as any)?.brands || (data as any)?.brand || data?.info?.brand || data?.info?.brandId;
@@ -114,11 +117,23 @@ registerServerDataHook("product", async (id, _slug, data) => {
                 const settingsObj = await Settings();
                 const limit = Math.min(20, Math.max(6, parseInt((settingsObj?.related_products_total as string) ?? "12", 10) || 12));
 
-                const catPosts = await Post.find({
-                    category: categoryId,
+                const catObj = mongoose.Types.ObjectId.isValid(categoryId)
+                    ? new mongoose.Types.ObjectId(categoryId)
+                    : null;
+                const catFilter = catObj ? { $in: [catObj, categoryId] } : categoryId;
+
+                let catPosts = await Post.find({
+                    category: catFilter,
                     type: "product",
                     status: "published",
                 }).limit(limit + 1).lean() as any[];
+
+                if (catPosts.length === 0) {
+                    catPosts = await Post.find({
+                        type: "product",
+                        status: "published",
+                    }).limit(limit + 1).lean() as any[];
+                }
 
                 if (catPosts.length === 0) return [];
 
@@ -150,7 +165,43 @@ registerServerDataHook("product", async (id, _slug, data) => {
                 return [];
             }
         })().then((list: any[]) => (list || []).filter((p: any) => String(p._id) !== String(id)).slice(0, 12))
-        : Promise.resolve([]);
+        : withCache(`products:recent_fallback`, async () => {
+            try {
+                const catPosts = await Post.find({
+                    type: "product",
+                    status: "published",
+                }).limit(15).lean() as any[];
+
+                if (catPosts.length === 0) return [];
+
+                const postIds = catPosts.map((p) => p._id);
+                const infoDocs = await PostInfo.find({
+                    postId: { $in: postIds },
+                    name: { $in: PRODUCT_CARD_FIELDS },
+                }).lean() as any[];
+
+                const infoByPost: Record<string, Record<string, string>> = {};
+                infoDocs.forEach((d) => {
+                    const pid = String(d.postId);
+                    if (!infoByPost[pid]) infoByPost[pid] = {};
+                    infoByPost[pid][d.name] = String(d.value ?? "");
+                });
+
+                return catPosts.map((p) => ({
+                    _id:       String(p._id),
+                    title:     String(p.title    ?? ""),
+                    slug:      String(p.slug     ?? ""),
+                    type:      String(p.type     ?? ""),
+                    status:    String(p.status   ?? ""),
+                    category:  p.category ? String(p.category) : null,
+                    createdAt: p.createdAt instanceof Date ? p.createdAt.toISOString() : String(p.createdAt ?? ""),
+                    updatedAt: p.updatedAt instanceof Date ? p.updatedAt.toISOString() : String(p.updatedAt ?? ""),
+                    info:      infoByPost[String(p._id)] || {},
+                }));
+            } catch {
+                return [];
+            }
+        })().then((list: any[]) => (list || []).filter((p: any) => String(p._id) !== String(id)).slice(0, 12));
 
     // ── 4. Brand Info (cached) ────────────────────────────────────────────
     const brandPromise = rawBrand
