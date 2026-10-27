@@ -91,9 +91,21 @@ export async function getCategoryPageData(
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
+function compactVariate(raw: string): string {
+    if (!raw || raw.length < 5000) return raw;
+    try {
+        const obj = JSON.parse(raw);
+        if (Array.isArray(obj.variants) && obj.variants.length > 5) {
+            obj.variants = obj.variants.slice(0, 5);
+            return JSON.stringify(obj);
+        }
+    } catch {}
+    return raw;
+}
+
 /** All published products in this category and every descendant sub-category */
 async function getProductsInCategory(catId: string): Promise<CategoryProduct[]> {
-    return withCache(`cat:products:${catId}`, async () => {
+    return withCache(`cat:products:v2:${catId}`, async () => {
         const allCatIds = await getDescendantIds(catId);
         const allCatIdStrings = allCatIds.map(id => String(id));
 
@@ -119,7 +131,7 @@ async function getProductsInCategory(catId: string): Promise<CategoryProduct[]> 
         for (const r of infoRecords) {
             const key = String(r.postId);
             if (!infoByPost[key]) infoByPost[key] = {};
-            infoByPost[key][r.name] = r.value;
+            infoByPost[key][r.name] = r.name === "_variate" ? compactVariate(r.value) : r.value;
         }
 
         return posts.map((p: any) => ({

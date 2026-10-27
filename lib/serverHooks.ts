@@ -63,14 +63,14 @@ registerServerDataHook("brands", async (catId, catSlug, catData) => {
 });
 
 registerServerDataHook("product-tag", async (catId, catSlug, catData) => {
-    const base = await withCache(`tag:page:${catId}`, () => getTagPageData(catId, catSlug))();
+    const base = await withCache(`tag:v2:page:${catId}`, () => getTagPageData(catId, catSlug))();
     return runCategoryEnrichers(base as unknown as Record<string, any>, catData ?? { _id: catId, slug: catSlug });
 });
 
 // ── Product post type ─────────────────────────────────────────────────────────
 
 registerServerDataHook("product", async (id, _slug, data) => {
-    return withCache(`product:full_page_data:${id}`, async () => {
+    return withCache(`product:v3:full_page_data:${id}`, async () => {
         await connectDB();
 
     const categoryId = (data?.category || data?.info?.category || data?.info?.categoryId)

@@ -96,9 +96,21 @@ async function getSubTags(tagId: string): Promise<CategorySubCat[]> {
     })();
 }
 
+function compactVariate(raw: string): string {
+    if (!raw || raw.length < 5000) return raw;
+    try {
+        const obj = JSON.parse(raw);
+        if (Array.isArray(obj.variants) && obj.variants.length > 5) {
+            obj.variants = obj.variants.slice(0, 5);
+            return JSON.stringify(obj);
+        }
+    } catch {}
+    return raw;
+}
+
 /** Fetch all published products tagged with this tag */
 async function getProductsInTag(tagId: string, tagSlug: string): Promise<CategoryProduct[]> {
-    return withCache(`tag:products:${tagId || tagSlug}`, async () => {
+    return withCache(`tag:products:v2:${tagId || tagSlug}`, async () => {
         // Resolve tag doc
         let tagDoc: any = null;
         if (mongoose.Types.ObjectId.isValid(tagId)) {
@@ -167,7 +179,7 @@ async function getProductsInTag(tagId: string, tagSlug: string): Promise<Categor
         for (const r of infoRecords) {
             const key = String(r.postId);
             if (!infoByPost[key]) infoByPost[key] = {};
-            infoByPost[key][r.name] = r.value;
+            infoByPost[key][r.name] = r.name === "_variate" ? compactVariate(r.value) : r.value;
         }
 
         return posts.map((p: any) => ({
