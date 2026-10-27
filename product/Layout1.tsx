@@ -37,6 +37,7 @@ interface ProductPageProps {
      */
     pageData?: {
         ancestors?:        { _id: string; title: string; slug: string }[];
+        tags?:             { _id: string; title: string; slug: string }[];
         seller?:           { _id: string; name: string; image: string; slug: string; city: string; state: string; bio: string; website: string; twitter: string; } | null;
         compareProducts?:  any[] | null;
         categoryProducts?: any[] | null;

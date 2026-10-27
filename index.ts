@@ -1,5 +1,5 @@
 import { addHook, addPostType, addCatType, addBuilderElement, type PluginMeta } from "@/hook";
-import { Text, Textarea, Select, Switch, CategoryHierarchicalSelect, Number } from "@/components/ui";
+import { Text, Textarea, Select, Switch, CategoryHierarchicalSelect, Number, ProductTagSelect } from "@/components/ui";
 import { registerLazyComponent } from "@/hook/pluginHooks";
 import cartElement from "./elements/Cart";
 import cartListElement from "./elements/CartList";
@@ -121,6 +121,14 @@ export function register() {
             color: "from-cyan-500 to-sky-600",
             position: 32,
         },
+        {
+            key: "product-tag",
+            label: "Tags",
+            postType: "product",
+            icon: "solar:hashtag-square-bold",
+            color: "from-purple-500 to-indigo-600",
+            position: 33,
+        },
     ], PLUGINS.nx);
 
     // ─── Admin nav items ────────────────────────────────────────────────────
@@ -157,6 +165,14 @@ export function register() {
             slug: "category/brands",
             parent: "product",
             position: 4,
+        },
+        {
+            key: "product-tags",
+            label: "Tags",
+            icon: "solar:hashtag-square-bold",
+            slug: "category/product-tag",
+            parent: "product",
+            position: 4.5,
         },
         {
             key: "product-attributes",
@@ -251,6 +267,15 @@ export function register() {
             position: 6,
             component: CategoryHierarchicalSelect,
             hierarchicalCatType: "brands",
+        },
+        {
+            key: "tags",
+            label: "Tags",
+            type: "product",
+            style: "right",
+            position: 7,
+            component: ProductTagSelect,
+            hierarchicalCatType: "product-tag",
         },
         {
             key: "sku",
@@ -499,6 +524,26 @@ export function register() {
             position: 10,
             active: true,
             component: ProductBrandLayout,
+        },
+        {
+            key: "product-tag-1",
+            label: "Tag 1",
+            type: "product-tag",
+            slug: "dynamic",
+            style: "left",
+            position: 10,
+            active: true,
+            component: ProductCategoryLayout1,
+        },
+        {
+            key: "product-tag-2",
+            label: "Tag 2",
+            type: "product-tag",
+            slug: "dynamic",
+            style: "left",
+            position: 20,
+            active: true,
+            component: ProductCategoryLayout2,
         },
     ], PLUGINS.nx);
 

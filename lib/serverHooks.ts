@@ -18,6 +18,7 @@
 import { registerServerDataHook, runProductEnrichers, runCategoryEnrichers } from "@/hook/serverDataHooks";
 import { getCategoryPageData, getCategoryAncestors } from "./category";
 import { getBrandPageData } from "./brand";
+import { getTagPageData } from "./tag";
 import connectDB from "@/lib/mongodb";
 import mongoose from "mongoose";
 import User from "@/models/Users";
@@ -58,6 +59,11 @@ registerServerDataHook("product-category", async (catId, catSlug, catData) => {
 registerServerDataHook("brands", async (catId, catSlug, catData) => {
     const subCategorySlug = (catData as any)?.subCategorySlug || null;
     const base = await withCache(`brand:page:${catId}:${subCategorySlug || "all"}`, () => getBrandPageData(catId, catSlug, subCategorySlug))();
+    return runCategoryEnrichers(base as unknown as Record<string, any>, catData ?? { _id: catId, slug: catSlug });
+});
+
+registerServerDataHook("product-tag", async (catId, catSlug, catData) => {
+    const base = await withCache(`tag:page:${catId}`, () => getTagPageData(catId, catSlug))();
     return runCategoryEnrichers(base as unknown as Record<string, any>, catData ?? { _id: catId, slug: catSlug });
 });
 
@@ -302,18 +308,121 @@ registerServerDataHook("product", async (id, _slug, data) => {
         return initialData;
     })();
 
-    // Run all 5 sub-queries in parallel
-    const [ancestors, seller, categoryProducts, brand, reviewsData] = await Promise.all([
+    // ── 6. Product Tags (cached) ──────────────────────────────────────────
+    let rawTags = data?.info?.tags || (data as any)?.tags || data?.info?.tag || (data as any)?.tag;
+    let parsedTagIds: string[] = [];
+    if (typeof rawTags === "string") {
+        try {
+            const parsed = JSON.parse(rawTags);
+            if (Array.isArray(parsed)) {
+                parsedTagIds = parsed.map((item) =>
+                    typeof item === "object" && item ? item.id || item._id || item.slug : String(item)
+                ).filter(Boolean);
+            } else if (parsed && typeof parsed === "object") {
+                parsedTagIds = [parsed.id || parsed._id || parsed.slug].filter(Boolean);
+            } else if (parsed) {
+                parsedTagIds = [String(parsed)].filter(Boolean);
+            }
+        } catch {
+            parsedTagIds = rawTags.split(",").map((s) => s.trim()).filter(Boolean);
+        }
+    } else if (Array.isArray(rawTags)) {
+        parsedTagIds = rawTags.map((item) =>
+            typeof item === "object" && item ? item.id || item._id || item.slug : String(item)
+        ).filter(Boolean);
+    }
+
+    if (parsedTagIds.length === 0 && id) {
+        try {
+            const tagInfoDoc = await PostInfo.findOne({ postId: id, name: "tags" }).lean() as any;
+            if (tagInfoDoc?.value) {
+                try {
+                    const parsed = JSON.parse(tagInfoDoc.value);
+                    if (Array.isArray(parsed)) {
+                        parsedTagIds = parsed.map((item) =>
+                            typeof item === "object" && item ? item.id || item._id || item.slug : String(item)
+                        ).filter(Boolean);
+                    } else if (parsed) {
+                        parsedTagIds = [String(parsed)].filter(Boolean);
+                    }
+                } catch {
+                    parsedTagIds = tagInfoDoc.value.split(",").map((s: string) => s.trim()).filter(Boolean);
+                }
+            }
+        } catch { /* keep empty */ }
+    }
+
+    const tagsPromise = parsedTagIds.length > 0
+        ? withCache(`product:tags:${parsedTagIds.slice().sort().join(",")}`, async () => {
+            try {
+                const objectIds = parsedTagIds
+                    .filter((tid) => mongoose.Types.ObjectId.isValid(tid))
+                    .map((tid) => new mongoose.Types.ObjectId(tid));
+
+                const orConditions: any[] = [];
+                if (objectIds.length > 0) {
+                    orConditions.push({ _id: { $in: objectIds } });
+                }
+                if (parsedTagIds.length > 0) {
+                    orConditions.push({ slug: { $in: parsedTagIds } });
+                    orConditions.push({ title: { $in: parsedTagIds } });
+                }
+
+                if (orConditions.length === 0) return [];
+
+                const tagDocs = await Cat.find({
+                    $or: orConditions,
+                    type: { $in: ["product-tag", "tag"] },
+                    status: { $ne: "trash" },
+                }).select("_id title slug").lean() as any[];
+
+                const docsMap = new Map<string, any>();
+                (tagDocs || []).forEach((t) => {
+                    docsMap.set(String(t._id), t);
+                    docsMap.set(String(t.slug), t);
+                });
+
+                const resolvedList: { _id: string; title: string; slug: string }[] = [];
+                const seenIds = new Set<string>();
+                for (const tid of parsedTagIds) {
+                    const doc = docsMap.get(tid);
+                    if (doc && !seenIds.has(String(doc._id))) {
+                        seenIds.add(String(doc._id));
+                        resolvedList.push({
+                            _id: String(doc._id),
+                            title: String(doc.title ?? ""),
+                            slug: String(doc.slug ?? ""),
+                        });
+                    }
+                }
+
+                return resolvedList.length > 0
+                    ? resolvedList
+                    : (tagDocs || []).map((t) => ({
+                          _id: String(t._id),
+                          title: String(t.title ?? ""),
+                          slug: String(t.slug ?? ""),
+                      }));
+            } catch {
+                return [];
+            }
+        })()
+        : Promise.resolve([]);
+
+    // Run all 6 sub-queries in parallel
+    const [ancestors, seller, categoryProducts, brand, reviewsData, tags] = await Promise.all([
         ancestorsPromise,
         sellerPromise,
         categoryProductsPromise,
         brandPromise,
         reviewsPromise,
+        tagsPromise,
     ]);
 
     // Base pageData — other plugins (e.g. gadgets, compare, flash-sale) enrich via registerProductEnricher()
     const base: Record<string, any> = {
         ancestors,
+        tags,
         seller,
         brand,
         compareProducts:   [],
