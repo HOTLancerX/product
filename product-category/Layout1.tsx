@@ -29,6 +29,8 @@ interface ProductCatProps {
     pageData?:     CategoryPageData;
     /** URL search params forwarded from the slug page */
     searchParams?: Record<string, string | string[] | undefined>;
+    builderTop?:   React.ReactNode;
+    builderBottom?: React.ReactNode;
 }
 
 function buildUrl(prefix: string, slug: string): string {
@@ -174,6 +176,8 @@ export default function ProductCategoryLayout1({
     permalinkMap = {},
     pageData,
     searchParams = {},
+    builderTop,
+    builderBottom,
 }: ProductCatProps) {
     const productPrefix = (permalinkMap['product'] ?? 'product')
         .trim().replace(/^\/+|\/+$/g, '') || 'product';
@@ -387,6 +391,9 @@ export default function ProductCategoryLayout1({
                 </header>
             )}
 
+            {/* builder top */}
+            {builderTop}
+
             {/* ── Main Category Container ── */}
             <div className="container py-8 space-y-6">
 
@@ -437,6 +444,9 @@ export default function ProductCategoryLayout1({
                     </section>
                 )}
             </div>
+
+            {/* builder bottom */}
+            {builderBottom}
         </main>
     );
 }

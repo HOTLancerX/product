@@ -28,6 +28,8 @@ interface ProductCatProps {
     permalinkMap?: Record<string, string>;
     pageData?:     CategoryPageData;
     searchParams?: Record<string, string | string[] | undefined>;
+    builderTop?:   React.ReactNode;
+    builderBottom?: React.ReactNode;
 }
 
 function buildUrl(prefix: string, slug: string): string {
@@ -166,6 +168,8 @@ export default function ProductCategoryLayout2({
     permalinkMap = {},
     pageData,
     searchParams = {},
+    builderTop,
+    builderBottom,
 }: ProductCatProps) {
     const productPrefix = (permalinkMap['product'] ?? 'product')
         .trim().replace(/^\/+|\/+$/g, '') || 'product';
@@ -293,7 +297,7 @@ export default function ProductCategoryLayout2({
                         backgroundPosition: 'center',
                     }}
                 >
-                    <div className="absolute inset-0 bg-gradient-to-r from-black/85 via-black/65 to-black/45" />
+                    <div className="absolute inset-0 bg-linear-to-r from-black/85 via-black/65 to-black/45" />
                     <div className="relative max-w-7xl mx-auto">
                         <nav className="flex items-center gap-1.5 text-xs sm:text-sm text-gray-300 mb-4 flex-wrap" aria-label="breadcrumb">
                             <Link href="/" className="hover:text-white transition-colors flex items-center gap-1">
@@ -338,7 +342,7 @@ export default function ProductCategoryLayout2({
                     </div>
                 </header>
             ) : (
-                <header className="relative py-12 px-4 sm:px-6 bg-gradient-to-b from-gray-50 via-gray-50/50 to-white border-b border-gray-100">
+                <header className="relative py-12 px-4 sm:px-6 bg-linear-to-b from-gray-50 via-gray-50/50 to-white border-b border-gray-100">
                     <div className="max-w-7xl mx-auto">
                         <nav className="flex items-center gap-1.5 text-xs sm:text-sm text-gray-500 mb-3 flex-wrap" aria-label="breadcrumb">
                             <Link href="/" className="hover:text-black transition-colors flex items-center gap-1">
@@ -383,6 +387,9 @@ export default function ProductCategoryLayout2({
                     </div>
                 </header>
             )}
+
+            {/* builder top */}
+            {builderTop}
 
             {/* ── Main Category Container ── */}
             <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8 space-y-6">
@@ -434,6 +441,9 @@ export default function ProductCategoryLayout2({
                     </section>
                 )}
             </div>
+
+            {/* builder bottom */}
+            {builderBottom}
         </main>
     );
 }

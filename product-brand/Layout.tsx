@@ -38,6 +38,8 @@ interface ProductBrandProps {
     pageData?:     BrandPageData;
     /** URL search params forwarded from the slug page */
     searchParams?: Record<string, string | string[] | undefined>;
+    builderTop?:   React.ReactNode;
+    builderBottom?: React.ReactNode;
 }
 
 function buildUrl(prefix: string, slug: string): string {
@@ -291,6 +293,8 @@ export default function ProductBrandLayout({
     permalinkMap = {},
     pageData,
     searchParams = {},
+    builderTop,
+    builderBottom,
 }: ProductBrandProps) {
     const brandPrefix = (permalinkMap['brands'] ?? 'brands').trim().replace(/^\/+|\/+$/g, '') || 'brands';
     const productPrefix = (permalinkMap['product'] ?? 'product').trim().replace(/^\/+|\/+$/g, '') || 'product';
@@ -522,6 +526,9 @@ export default function ProductBrandLayout({
                 </div>
             </section>
 
+            {/* builder top */}
+            {builderTop}
+
             {/* ── Product Listing & Filter Section ── */}
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12">
                 <ProductGridClient
@@ -541,6 +548,9 @@ export default function ProductBrandLayout({
                     {cardGrid}
                 </ProductGridClient>
             </div>
+
+            {/* builder bottom */}
+            {builderBottom}
         </main>
     );
 }
